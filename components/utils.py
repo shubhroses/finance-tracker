@@ -1,3 +1,4 @@
+import streamlit as st
 import time
 import random
 from functools import wraps
@@ -108,10 +109,61 @@ def get_stock_news(ticker_symbol, max_retries=5, initial_delay=2):
             # Use custom session
             stock = yf.Ticker(ticker_symbol)
             stock._session = get_session()
-            news = stock.news
             
-            if news:
-                return news
+            try:
+                # Try to get news directly from the news property
+                news = stock.news
+                if news:
+                    logger.info(f"Successfully fetched {len(news)} news items from yfinance")
+                    # Log the structure of the first news item for debugging
+                    if news:
+                        logger.info(f"Sample news item structure: {list(news[0].keys())}")
+                    return news
+            except Exception as e:
+                logger.warning(f"Error getting news from stock.news: {str(e)}")
+            
+            # If news property fails, try getting it from fast_info
+            try:
+                news = stock.fast_info
+                if hasattr(news, 'news') and news.news:
+                    logger.info(f"Successfully fetched news from fast_info")
+                    return news.news
+            except Exception as e:
+                logger.warning(f"Error getting news from fast_info: {str(e)}")
+            
+            # If both methods fail, try scraping the website directly
+            try:
+                session = get_session()
+                url = f"https://finance.yahoo.com/quote/{ticker_symbol}/news"
+                response = session.get(url, timeout=10)
+                
+                if response.status_code == 200:
+                    from bs4 import BeautifulSoup
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    news_items = []
+                    articles = soup.find_all(['h3', 'a'], class_=['Mb(5px)'])
+                    
+                    for article in articles:
+                        if article.text and article.get('href'):
+                            news_items.append({
+                                'title': article.text.strip(),
+                                'link': f"https://finance.yahoo.com{article.get('href')}",
+                                'publisher': 'Yahoo Finance',
+                                'providerPublishTime': int(datetime.now().timestamp()),
+                                'type': 'STORY'
+                            })
+                    
+                    if news_items:
+                        logger.info(f"Successfully scraped {len(news_items)} news items from Yahoo Finance website")
+                        return news_items
+            except Exception as e:
+                logger.warning(f"Error scraping Yahoo Finance website: {str(e)}")
+            
+            # If we get here, all methods failed for this attempt
+            if attempt == max_retries - 1:
+                logger.error("All methods failed to fetch news")
+                return None
                 
         except Exception as e:
             if "429" in str(e):

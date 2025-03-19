@@ -10,9 +10,6 @@ from components.portfolio import show_portfolio_analyzer
 from components.news import show_news_sentiment
 from components.utils import get_stock_info
 
-# Disable file watcher in production
-st.set_option('server.fileWatcherType', 'none')
-
 # Set page config
 st.set_page_config(
     page_title="Finance Tracker",

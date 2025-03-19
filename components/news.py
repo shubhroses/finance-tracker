@@ -11,7 +11,8 @@ import requests
 from bs4 import BeautifulSoup
 import json
 import time
-from .utils import get_stock_news
+from .utils import get_stock_news, get_session
+import random
 
 # Configure logging
 logging.basicConfig(
@@ -21,31 +22,27 @@ logging.basicConfig(
 logger = logging.getLogger('news_sentiment')
 
 @st.cache_data(ttl=300)  # Cache for 5 minutes
-def get_yahoo_finance_news(ticker_symbol, max_retries=3, retry_delay=1):
+def get_yahoo_finance_news(ticker_symbol, max_retries=5, retry_delay=2):
     """Get news from Yahoo Finance with retry logic and caching."""
     for attempt in range(max_retries):
         try:
             # Add delay between retries
             if attempt > 0:
-                time.sleep(retry_delay)
+                delay = (retry_delay * (2 ** attempt)) + (random.random() * 0.5)
+                logger.info(f"Retry attempt {attempt + 1}/{max_retries} after {delay:.2f}s delay")
+                time.sleep(delay)
             
             urls = [
                 f"https://finance.yahoo.com/quote/{ticker_symbol}/news",
                 f"https://finance.yahoo.com/quote/{ticker_symbol}"
             ]
             
-            headers = {
-                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-                'Accept-Language': 'en-US,en;q=0.5',
-                'Connection': 'keep-alive',
-            }
-            
+            session = get_session()  # Use the shared session from utils.py
             news_items = []
             
             for url in urls:
                 try:
-                    response = requests.get(url, headers=headers, timeout=10)
+                    response = session.get(url, timeout=10)
                     
                     # Handle rate limiting
                     if response.status_code == 429:
@@ -143,13 +140,9 @@ def get_marketwatch_news(ticker_symbol, limit=10):
     """Fetch news from MarketWatch with caching"""
     try:
         url = f"https://www.marketwatch.com/investing/stock/{ticker_symbol}"
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Connection': 'keep-alive',
-        }
-        response = requests.get(url, headers=headers, timeout=10)
+        session = get_session()  # Use the shared session from utils.py
+        
+        response = session.get(url, timeout=10)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
@@ -379,19 +372,64 @@ def show_news_sentiment(ticker_symbol):
                 logger.info(f"Found {len(news_items)} news items from yfinance")
                 
                 for item in news_items:
-                    if validate_news_item(item):
-                        valid_news.append(item)
+                    # Log the item structure for debugging
+                    logger.info(f"Processing news item with keys: {list(item.keys())}")
+                    
+                    # Try to extract title from different fields
+                    title = None
+                    if isinstance(item, dict):
+                        # Try multiple fields for title
+                        for field in ['title', 'headline', 'Title', 'Headline']:
+                            if field in item and item[field]:
+                                title = item[field]
+                                break
+                        
+                        # If no title found, try using the first sentence of description/summary
+                        if not title:
+                            for field in ['description', 'summary', 'Description', 'Summary']:
+                                if field in item and item[field]:
+                                    title = item[field].split('.')[0].strip()
+                                    break
+                    
+                    # If we found a title, create a valid news item
+                    if title:
+                        # Try multiple fields for link/url
+                        link = None
+                        for field in ['link', 'url', 'Link', 'URL']:
+                            if field in item and item[field]:
+                                link = item[field]
+                                break
+                        
+                        if not link:
+                            logger.warning(f"No link found for news item with title: {title}")
+                            continue
+                        
+                        # Create the news item with all available fields
+                        valid_item = {
+                            'title': title,
+                            'link': link,
+                            'publisher': item.get('publisher', 'Yahoo Finance'),
+                            'published': format_date(item.get('providerPublishTime', datetime.now().timestamp())),
+                            'summary': item.get('description', item.get('summary', '')),
+                            'type': item.get('type', 'STORY')
+                        }
+                        
+                        if validate_news_item(valid_item):
+                            valid_news.append(valid_item)
+                            logger.info(f"Added valid news item: {valid_item['title']}")
+                        else:
+                            logger.warning(f"Invalid news item: {valid_item}")
                     else:
-                        logger.warning(f"Invalid news item from yfinance")
+                        logger.warning("Could not find title in news item")
             
             # If no valid news from Yahoo Finance, try MarketWatch
             if not valid_news:
-                logger.info("Insufficient news items, trying alternative sources")
+                logger.info("No valid news items from Yahoo Finance, trying MarketWatch")
                 marketwatch_news = get_marketwatch_news(ticker_symbol)
                 
                 if marketwatch_news:
                     valid_news.extend(marketwatch_news)
-                    logger.info(f"Found {len(marketwatch_news)} valid MarketWatch articles")
+                    logger.info(f"Added {len(marketwatch_news)} valid MarketWatch articles")
             
             if valid_news:
                 # Sort news by date if available
@@ -406,8 +444,8 @@ def show_news_sentiment(ticker_symbol):
                         # Create a card-like container using Streamlit's native components
                         col1 = st.container()
                         with col1:
-                            # Display title
-                            st.markdown(f"### {article['title']}")
+                            # Display title with publisher badge
+                            st.markdown(f"### {article['title']} {get_publisher_badge(article['publisher'])}")
                             
                             # Display metadata (date and publisher)
                             st.markdown(
@@ -438,7 +476,7 @@ def show_news_sentiment(ticker_symbol):
                 )
                 
     except Exception as e:
-        logger.error(f"Error in show_news_sentiment: {str(e)}")
+        logger.error(f"Error in show_news_sentiment: {str(e)}\n{traceback.format_exc()}")
         st.error(
             """Unable to fetch news articles. This could be due to:
             - Service disruption
@@ -447,6 +485,15 @@ def show_news_sentiment(ticker_symbol):
             
             Please try again later."""
         )
+
+def get_publisher_badge(publisher):
+    """Return a colored badge based on the publisher's reliability"""
+    if publisher.lower() in ['reuters', 'bloomberg', 'cnbc', 'financial times']:
+        return "🟢"  # High reliability
+    elif publisher.lower() in ['yahoo finance', 'marketwatch', 'seeking alpha']:
+        return "🟡"  # Standard reliability
+    else:
+        return "⚪"  # Unknown reliability
 
 def show_recent_news(news):
     """Display recent news articles."""
