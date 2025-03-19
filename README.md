@@ -1,120 +1,101 @@
-# YFinance Demo
+# Finance Tracker
 
-A simple demonstration of the `yfinance` library capabilities for retrieving and analyzing stock market data.
+A comprehensive stock analysis and portfolio management tool built with Streamlit.
 
-## Features Demonstrated
+## Features
 
-This repository contains three demo scripts showcasing different ways to use the yfinance library:
+- 📊 Single Stock Analysis
+- 🔄 Stock Comparison
+- 💼 Portfolio Analysis
+- 📈 Technical Indicators
+- 📰 News & Sentiment Analysis
 
-1. **yfinance_demo.py** - A basic demonstration of core yfinance features
-2. **portfolio_analysis.py** - Analysis of a portfolio of stocks with performance metrics
-3. **stock_comparison.py** - Command-line tool to compare multiple stocks over a specific time period
+## Quick Deploy
 
-## Requirements
+### Deploy on Streamlit Cloud (Recommended)
 
-- Python 3.6+
-- yfinance
-- matplotlib
-- pandas
-- numpy (for portfolio analysis)
+1. Fork this repository to your GitHub account
+2. Visit [share.streamlit.io](https://share.streamlit.io)
+3. Sign in with GitHub
+4. Click "New app"
+5. Select this repository and branch
+6. Select `app.py` as the main file
+7. Click "Deploy"
 
-## Installation
+### Local Development
 
-Install the required packages:
-
+1. Clone the repository:
 ```bash
-pip install yfinance matplotlib pandas numpy
+git clone <your-repo-url>
+cd finance-tracker
+```
+
+2. Create a virtual environment:
+```bash
+python -m venv venv
+source venv/bin/activate  # On Windows: venv\Scripts\activate
+```
+
+3. Install dependencies:
+```bash
+pip install -r requirements.txt
+```
+
+4. Run the application:
+```bash
+streamlit run app.py
 ```
 
 ## Usage
 
-### 1. Basic YFinance Demo
+1. Select an analysis type from the sidebar (Stock Analysis, Compare Stocks, or Portfolio Analysis)
+2. For Stock Analysis:
+   - Enter a stock ticker (e.g., AAPL)
+   - Choose time period
+   - Explore different tabs for detailed analysis
+3. For Stock Comparison:
+   - Enter multiple tickers
+   - Compare performance and metrics
+4. For Portfolio Analysis:
+   - Enter your holdings
+   - View portfolio metrics and allocation
 
-Run the basic demo script:
+## Project Structure
 
-```bash
-python yfinance_demo.py
+```
+finance-tracker/
+├── app.py                  # Main application file
+├── requirements.txt        # Project dependencies
+├── README.md              # Project documentation
+└── components/            # Application components
+    ├── __init__.py
+    ├── sidebar.py         # Sidebar component
+    ├── overview.py        # Company overview component
+    ├── charts.py         # Price charts component
+    ├── technical.py      # Technical analysis component
+    ├── financials.py     # Financial metrics component
+    ├── comparison.py     # Stock comparison component
+    ├── portfolio.py      # Portfolio analysis component
+    └── news.py           # News and sentiment component
 ```
 
-This will:
-- Fetch data for Apple Inc. (AAPL)
-- Display company information
-- Print recent historical price data
-- Create a chart image (`stock_chart.png`)
-- Show financial statement data
-- Display dividend information
+## Dependencies
 
-### 2. Portfolio Analysis
+- streamlit>=1.28.0
+- yfinance>=0.2.31
+- pandas>=2.1.0
+- numpy>=1.24.0
+- plotly>=5.18.0
+- python-dateutil>=2.8.2
 
-Run the portfolio analysis script:
+## Data Sources
 
-```bash
-python portfolio_analysis.py
-```
+This application uses the Yahoo Finance API (via yfinance) to fetch real-time and historical financial data. Please note that API limitations may affect data retrieval.
 
-This script:
-- Analyzes a pre-defined portfolio (AAPL, MSFT, AMZN, GOOGL, TSLA)
-- Calculates portfolio returns, volatility, and Sharpe ratio
-- Creates a performance chart showing all stocks and the portfolio (`portfolio_performance.png`)
-- Generates a correlation matrix heatmap of stock returns (`correlation_matrix.png`)
+## Contributing
 
-### 3. Stock Comparison Tool
+Pull requests are welcome. For major changes, please open an issue first to discuss what you would like to change.
 
-Run the stock comparison tool with command-line arguments:
+## License
 
-```bash
-python stock_comparison.py AAPL MSFT GOOGL
-```
-
-Additional options:
-```bash
-python stock_comparison.py AAPL MSFT GOOGL --start 2023-01-01 --end 2024-01-01 --interval 1wk
-```
-
-Parameters:
-- Positional arguments: Ticker symbols to compare
-- `--start`: Start date (YYYY-MM-DD), defaults to 1 year ago
-- `--end`: End date (YYYY-MM-DD), defaults to today
-- `--interval`: Data interval (1d, 1wk, 1mo), defaults to 1d (daily)
-
-The script will:
-- Download price data for the specified stocks
-- Calculate performance metrics (returns, volatility, Sharpe ratio)
-- Create a comparison chart with normalized prices (`stock_comparison.png`)
-
-## Customization
-
-### Basic Demo
-To analyze a different stock in the basic demo, change the `ticker_symbol` variable in the script:
-
-```python
-# Define the ticker symbol
-ticker_symbol = "MSFT"  # Microsoft instead of Apple
-```
-
-### Portfolio Analysis
-To modify the portfolio, edit the `portfolio` dictionary in the script:
-
-```python
-portfolio = {
-    'AAPL': 0.20,   # Apple (20%)
-    'MSFT': 0.20,   # Microsoft (20%)
-    'AMZN': 0.20,   # Amazon (20%)
-    'GOOGL': 0.20,  # Alphabet (20%)
-    'BRK-B': 0.20   # Berkshire Hathaway (20%)
-}
-```
-
-## Additional YFinance Features
-
-The `yfinance` library offers many more features not covered in these demos:
-- Options chain data
-- Recommendation trends
-- Institutional holders information
-- News and analysis
-- Balance sheet and cash flow statements
-
-## Resources
-
-- [YFinance Documentation](https://github.com/ranaroussi/yfinance)
-- [Yahoo Finance](https://finance.yahoo.com/) 
+[MIT](https://choosealicense.com/licenses/mit/) 
