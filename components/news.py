@@ -10,6 +10,8 @@ import traceback
 import requests
 from bs4 import BeautifulSoup
 import json
+import time
+from .utils import get_stock_news
 
 # Configure logging
 logging.basicConfig(
@@ -18,174 +20,242 @@ logging.basicConfig(
 )
 logger = logging.getLogger('news_sentiment')
 
-def get_yahoo_finance_news(ticker_symbol):
-    """Get news from Yahoo Finance."""
-    try:
-        # Try multiple URL patterns
-        urls = [
-            f"https://finance.yahoo.com/quote/{ticker_symbol}/news",
-            f"https://finance.yahoo.com/quote/{ticker_symbol}"
-        ]
-        
-        headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-            'Accept-Language': 'en-US,en;q=0.5',
-            'Connection': 'keep-alive',
-            'Upgrade-Insecure-Requests': '1',
-            'Cache-Control': 'max-age=0'
-        }
-        
-        news_items = []
-        
-        for url in urls:
-            try:
-                response = requests.get(url, headers=headers, timeout=10)
-                response.raise_for_status()
-                
-                soup = BeautifulSoup(response.text, 'html.parser')
-                
-                # Try multiple class patterns for news items
-                news_containers = [
-                    soup.find_all('div', {'class': ['Ov(h)', 'IframeSecondaryStream']}),
-                    soup.find_all('div', {'data-test': 'story'}),
-                    soup.find_all('li', {'class': 'js-stream-content'}),
-                    soup.find_all('div', {'class': 'news-link-container'})
-                ]
-                
-                for container in news_containers:
-                    if container:
-                        for item in container:
-                            try:
-                                # Try multiple patterns for title and link
-                                title_elem = (
-                                    item.find(['h3', 'a']) or 
-                                    item.find('div', {'class': 'text'}) or
-                                    item.find('div', {'class': 'headline'})
-                                )
-                                
-                                if not title_elem:
-                                    continue
-                                
-                                title = title_elem.text.strip()
-                                link = title_elem.get('href', '')
-                                
-                                if not link and title_elem.parent.name == 'a':
-                                    link = title_elem.parent.get('href', '')
-                                
-                                if link and not link.startswith('http'):
-                                    link = 'https://finance.yahoo.com' + link
-                                
-                                # Try multiple patterns for publisher and time
-                                meta = (
-                                    item.find('div', {'class': ['C(#959595)', 'Fz(11px)']}) or
-                                    item.find('div', {'class': 'source'}) or
-                                    item.find('div', {'class': 'provider'})
-                                )
-                                
-                                publisher = "Yahoo Finance"
-                                if meta:
-                                    publisher_text = meta.text.split('·')[0].strip()
-                                    if publisher_text:
-                                        publisher = publisher_text
-                                
-                                if title and link:
-                                    news_item = {
-                                        'title': title,
-                                        'link': link,
-                                        'publisher': publisher,
-                                        'providerPublishTime': int(datetime.now().timestamp()),
-                                        'type': 'STORY',
-                                        'summary': ''
-                                    }
-                                    
-                                    # Check for duplicates before adding
-                                    if not any(x['title'] == title for x in news_items):
-                                        news_items.append(news_item)
-                                        
-                                        if len(news_items) >= 10:
-                                            return news_items
-                                            
-                            except Exception as e:
-                                logger.warning(f"Error parsing Yahoo Finance news item: {str(e)}")
-                                continue
-                                
-                if news_items:
-                    break
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def get_yahoo_finance_news(ticker_symbol, max_retries=3, retry_delay=1):
+    """Get news from Yahoo Finance with retry logic and caching."""
+    for attempt in range(max_retries):
+        try:
+            # Add delay between retries
+            if attempt > 0:
+                time.sleep(retry_delay)
+            
+            urls = [
+                f"https://finance.yahoo.com/quote/{ticker_symbol}/news",
+                f"https://finance.yahoo.com/quote/{ticker_symbol}"
+            ]
+            
+            headers = {
+                'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+                'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
+                'Accept-Language': 'en-US,en;q=0.5',
+                'Connection': 'keep-alive',
+            }
+            
+            news_items = []
+            
+            for url in urls:
+                try:
+                    response = requests.get(url, headers=headers, timeout=10)
                     
-            except requests.RequestException as e:
-                logger.warning(f"Error fetching from {url}: {str(e)}")
-                continue
-        
-        return news_items
-        
-    except Exception as e:
-        logger.error(f"Error in get_yahoo_finance_news: {str(e)}")
-        return []
+                    # Handle rate limiting
+                    if response.status_code == 429:
+                        logger.warning(f"Rate limited by Yahoo Finance (attempt {attempt + 1}/{max_retries})")
+                        continue
+                        
+                    response.raise_for_status()
+                    
+                    soup = BeautifulSoup(response.text, 'html.parser')
+                    
+                    # Try multiple class patterns for news items
+                    news_containers = [
+                        soup.find_all('div', {'class': ['Ov(h)', 'IframeSecondaryStream']}),
+                        soup.find_all('div', {'data-test': 'story'}),
+                        soup.find_all('li', {'class': 'js-stream-content'}),
+                        soup.find_all('div', {'class': 'news-link-container'})
+                    ]
+                    
+                    for container in news_containers:
+                        if container:
+                            for item in container:
+                                try:
+                                    # Try multiple patterns for title and link
+                                    title_elem = (
+                                        item.find(['h3', 'a']) or 
+                                        item.find('div', {'class': 'text'}) or
+                                        item.find('div', {'class': 'headline'})
+                                    )
+                                    
+                                    if not title_elem:
+                                        continue
+                                    
+                                    title = title_elem.text.strip()
+                                    link = title_elem.get('href', '')
+                                    
+                                    if not link and title_elem.parent.name == 'a':
+                                        link = title_elem.parent.get('href', '')
+                                    
+                                    if link and not link.startswith('http'):
+                                        link = 'https://finance.yahoo.com' + link
+                                    
+                                    # Try multiple patterns for publisher and time
+                                    meta = (
+                                        item.find('div', {'class': ['C(#959595)', 'Fz(11px)']}) or
+                                        item.find('div', {'class': 'source'}) or
+                                        item.find('div', {'class': 'provider'})
+                                    )
+                                    
+                                    publisher = "Yahoo Finance"
+                                    if meta:
+                                        publisher_text = meta.text.split('·')[0].strip()
+                                        if publisher_text:
+                                            publisher = publisher_text
+                                    
+                                    if title and link:
+                                        news_item = {
+                                            'title': title,
+                                            'link': link,
+                                            'publisher': publisher,
+                                            'published': datetime.now().strftime('%Y-%m-%d %H:%M:%S'),
+                                            'type': 'STORY',
+                                            'summary': ''
+                                        }
+                                        
+                                        # Check for duplicates before adding
+                                        if not any(x['title'] == title for x in news_items):
+                                            news_items.append(news_item)
+                                            
+                                            if len(news_items) >= 10:
+                                                return news_items
+                                                
+                                except Exception as e:
+                                    logger.warning(f"Error parsing Yahoo Finance news item: {str(e)}")
+                                    continue
+                                    
+                    if news_items:
+                        break
+                        
+                except requests.RequestException as e:
+                    logger.warning(f"Error fetching from {url}: {str(e)}")
+                    continue
+            
+            if news_items:
+                return news_items
+                
+        except Exception as e:
+            logger.error(f"Error in get_yahoo_finance_news (attempt {attempt + 1}/{max_retries}): {str(e)}")
+            if attempt == max_retries - 1:
+                return []
+    
+    return []
 
-def get_marketwatch_news(ticker_symbol):
-    """Get news from MarketWatch."""
+@st.cache_data(ttl=300)  # Cache for 5 minutes
+def get_marketwatch_news(ticker_symbol, limit=10):
+    """Fetch news from MarketWatch with caching"""
     try:
-        # Use the latest news URL
-        url = f"https://www.marketwatch.com/investing/stock/{ticker_symbol}/news"
+        url = f"https://www.marketwatch.com/investing/stock/{ticker_symbol}"
         headers = {
-            'User-Agent': 'Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
             'Accept-Language': 'en-US,en;q=0.5',
             'Connection': 'keep-alive',
         }
-        
         response = requests.get(url, headers=headers, timeout=10)
         response.raise_for_status()
         
         soup = BeautifulSoup(response.text, 'html.parser')
         news_items = []
         
-        # Look for news items in the article list
-        news_list = soup.find_all('div', {'class': ['article__content', 'story__content']})
+        # Find news articles - try multiple selectors
+        articles = (
+            soup.find_all('div', class_='article__content') or
+            soup.find_all('div', class_='element element--article') or
+            soup.find_all('div', class_='story__content') or
+            soup.find_all('div', class_='article__wrap')
+        )
         
-        for item in news_list:
+        for article in articles[:limit]:
             try:
-                # Find title and link
-                title_elem = item.find('a', {'class': ['link', 'headline']})
+                # Try multiple patterns for title
+                title_elem = (
+                    article.find('a', class_='link') or
+                    article.find('h3', class_='article__headline') or
+                    article.find('a', class_='headline__link') or
+                    article.find('h3', class_='headline')
+                )
+                
                 if not title_elem:
                     continue
-                    
+                
                 title = title_elem.text.strip()
                 link = title_elem.get('href', '')
+                
                 if not link.startswith('http'):
-                    link = 'https://www.marketwatch.com' + link
+                    link = f"https://www.marketwatch.com{link}"
                 
-                # Find time element
-                time_elem = item.find(['time', 'span'], {'class': ['article__timestamp', 'timestamp']})
+                # Try multiple patterns for timestamp
+                timestamp_elem = (
+                    article.find('span', class_='article__timestamp') or
+                    article.find('div', class_='article__details') or
+                    article.find('time', class_='timestamp') or
+                    article.find('div', class_='timestamp')
+                )
                 
-                # Create news item
-                if title and link:
-                    news_item = {
-                        'title': title,
-                        'link': link,
-                        'publisher': 'MarketWatch',
-                        'providerPublishTime': int(datetime.now().timestamp()),
-                        'type': 'STORY',
-                        'summary': ''
-                    }
+                # Default to current time if no timestamp found
+                timestamp = datetime.now()
+                
+                if timestamp_elem:
+                    timestamp_text = timestamp_elem.text.strip().lower()
+                    try:
+                        # Handle relative time formats
+                        if 'ago' in timestamp_text:
+                            value = int(''.join(filter(str.isdigit, timestamp_text)))
+                            if 'minute' in timestamp_text or 'min' in timestamp_text:
+                                timestamp = datetime.now() - timedelta(minutes=value)
+                            elif 'hour' in timestamp_text or 'hr' in timestamp_text:
+                                timestamp = datetime.now() - timedelta(hours=value)
+                            elif 'day' in timestamp_text:
+                                timestamp = datetime.now() - timedelta(days=value)
+                            elif 'week' in timestamp_text:
+                                timestamp = datetime.now() - timedelta(weeks=value)
+                            elif 'month' in timestamp_text:
+                                timestamp = datetime.now() - timedelta(days=value * 30)
+                        # Handle absolute time formats
+                        elif ':' in timestamp_text:  # Today's time
+                            time_parts = timestamp_text.split(':')
+                            if len(time_parts) == 2:
+                                hour, minute = map(int, time_parts)
+                                timestamp = datetime.now().replace(hour=hour, minute=minute)
+                        elif '/' in timestamp_text:  # Date format
+                            timestamp = datetime.strptime(timestamp_text, '%m/%d/%Y')
+                    except Exception as e:
+                        logger.warning(f"Error parsing timestamp '{timestamp_text}': {str(e)}")
+                
+                # Try to get summary
+                summary_elem = (
+                    article.find('p', class_='article__summary') or
+                    article.find('div', class_='article__description') or
+                    article.find('p', class_='description')
+                )
+                summary = summary_elem.text.strip() if summary_elem else ""
+                
+                news_item = {
+                    'title': title,
+                    'link': link,
+                    'publisher': 'MarketWatch',
+                    'published': timestamp.strftime('%Y-%m-%d %H:%M:%S'),
+                    'summary': summary,
+                    'type': 'article'
+                }
+                
+                if validate_news_item(news_item):
                     news_items.append(news_item)
                     
-                    if len(news_items) >= 10:  # Limit to 10 most recent news items
-                        break
-                        
             except Exception as e:
-                logger.warning(f"Error parsing MarketWatch news item: {str(e)}")
+                logger.error(f"Error parsing MarketWatch article: {str(e)}")
                 continue
         
-        return news_items
-        
-    except requests.RequestException as e:
-        logger.error(f"Network error fetching MarketWatch news: {str(e)}")
-        return []
+        if news_items:
+            # Sort news items by timestamp, most recent first
+            news_items.sort(key=lambda x: datetime.strptime(x['published'], '%Y-%m-%d %H:%M:%S'), reverse=True)
+            logger.info(f"Successfully fetched {len(news_items)} news items from MarketWatch")
+            return news_items
+        else:
+            logger.warning("No valid news items found from MarketWatch")
+            return None
+            
     except Exception as e:
         logger.error(f"Error fetching MarketWatch news: {str(e)}")
-        return []
+        return None
 
 def get_seeking_alpha_news(ticker_symbol):
     """Get news from Seeking Alpha."""
@@ -259,183 +329,124 @@ def get_seeking_alpha_news(ticker_symbol):
         logger.error(f"Error fetching Seeking Alpha news: {str(e)}")
         return []
 
-def show_news_sentiment(ticker_symbol):
-    """Display news and sentiment analysis for a given stock."""
+def validate_news_item(item):
+    """Validate if a news item has all required fields"""
+    required_fields = ['title', 'link', 'publisher']
     
-    st.header('News & Sentiment Analysis')
+    if not isinstance(item, dict):
+        return False
+        
+    for field in required_fields:
+        if field not in item or not item[field]:
+            return False
+            
+    # Ensure we have either providerPublishTime or published
+    if 'providerPublishTime' not in item and 'published' not in item:
+        item['published'] = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+    return True
+
+def format_date(timestamp):
+    """Format timestamp to readable date"""
+    try:
+        if isinstance(timestamp, (int, float)):
+            # Check if timestamp is in milliseconds
+            if timestamp > 1e11:
+                timestamp = timestamp / 1000
+            return datetime.fromtimestamp(timestamp).strftime('%Y-%m-%d %H:%M:%S')
+        elif isinstance(timestamp, str):
+            # Try parsing the string date
+            try:
+                return datetime.strptime(timestamp, '%Y-%m-%d %H:%M:%S').strftime('%Y-%m-%d %H:%M:%S')
+            except ValueError:
+                return timestamp
+        return timestamp
+    except Exception as e:
+        logger.error(f"Error formatting date: {str(e)}")
+        return datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+
+def show_news_sentiment(ticker_symbol):
+    """Display news and sentiment analysis for a given stock"""
+    st.header("News & Sentiment Analysis")
     
     try:
-        # Show loading message
-        with st.spinner('Fetching news from multiple sources...'):
-            # Initialize news list
-            all_news = []
-            
-            # Try yfinance first
-            try:
-                stock = yf.Ticker(ticker_symbol)
-                yf_news = stock.news
-                
-                if yf_news:
-                    logger.info(f"Found {len(yf_news)} news items from yfinance")
-                    
-                    # Process yfinance news items
-                    for article in yf_news:
-                        try:
-                            # Ensure required fields exist
-                            if not article.get('title'):
-                                logger.warning("Skipping article without title")
-                                continue
-                                
-                            # Convert unix timestamp to datetime if needed
-                            timestamp = article.get('providerPublishTime', 0)
-                            if timestamp == 0 and article.get('publishedAt'):
-                                try:
-                                    timestamp = int(datetime.strptime(article['publishedAt'], '%Y-%m-%dT%H:%M:%SZ').timestamp())
-                                except Exception as e:
-                                    logger.warning(f"Error parsing publishedAt date: {e}")
-                                    timestamp = int(datetime.now().timestamp())
-                            
-                            # Create standardized news item
-                            news_item = {
-                                'title': article.get('title'),
-                                'link': article.get('link'),
-                                'publisher': article.get('publisher', 'Yahoo Finance'),
-                                'providerPublishTime': timestamp,
-                                'type': article.get('type', 'STORY'),
-                                'summary': article.get('summary', '')
-                            }
-                            
-                            all_news.append(news_item)
-                            logger.debug(f"Processed yfinance article: {news_item['title']}")
-                            
-                        except Exception as e:
-                            logger.warning(f"Error processing yfinance article: {str(e)}")
-                            continue
-                    
-                    logger.info(f"Successfully processed {len(all_news)} yfinance news items")
-                else:
-                    logger.warning("No news items found from yfinance")
-            except Exception as e:
-                logger.warning(f"Error fetching yfinance news: {str(e)}")
-            
-            # Try other sources if needed
-            if len(all_news) < 5:
-                logger.info("Insufficient news items, trying alternative sources")
-                
-                # Try Yahoo Finance web scraping
-                try:
-                    yahoo_news = get_yahoo_finance_news(ticker_symbol)
-                    if yahoo_news:
-                        all_news.extend(yahoo_news)
-                        logger.info(f"Found {len(yahoo_news)} news items from Yahoo Finance scraping")
-                except Exception as e:
-                    logger.warning(f"Error fetching Yahoo Finance news: {str(e)}")
-                
-                # Try MarketWatch
-                try:
-                    marketwatch_news = get_marketwatch_news(ticker_symbol)
-                    if marketwatch_news:
-                        all_news.extend(marketwatch_news)
-                        logger.info(f"Found {len(marketwatch_news)} news items from MarketWatch")
-                except Exception as e:
-                    logger.warning(f"Error fetching MarketWatch news: {str(e)}")
-                
-                # Try Seeking Alpha
-                try:
-                    seeking_alpha_news = get_seeking_alpha_news(ticker_symbol)
-                    if seeking_alpha_news:
-                        all_news.extend(seeking_alpha_news)
-                        logger.info(f"Found {len(seeking_alpha_news)} news items from Seeking Alpha")
-                except Exception as e:
-                    logger.warning(f"Error fetching Seeking Alpha news: {str(e)}")
-            
-            # Validate and deduplicate news
+        with st.spinner('Fetching news articles...'):
+            # First try to get news from Yahoo Finance with caching
+            news_items = get_stock_news(ticker_symbol)
             valid_news = []
-            seen_titles = set()
             
-            for article in all_news:
-                try:
-                    # Skip if we've seen this title before
-                    title = article.get('title', '').strip()
-                    if not title or title in seen_titles:
-                        continue
-                    
-                    # Ensure we have required fields
-                    if not article.get('link'):
-                        logger.warning(f"Skipping article without link: {title}")
-                        continue
-                    
-                    # Check if article has valid timestamp (after 2000)
-                    timestamp = article.get('providerPublishTime', 0)
-                    if timestamp <= 946684800:  # January 1, 2000
-                        logger.warning(f"Skipping article with invalid timestamp: {title}")
-                        continue
-                    
-                    valid_news.append(article)
-                    seen_titles.add(title)
-                    logger.debug(f"Added valid article: {title}")
-                    
-                except Exception as e:
-                    logger.warning(f"Error validating article: {str(e)}")
-                    continue
+            if news_items:
+                logger.info(f"Found {len(news_items)} news items from yfinance")
+                
+                for item in news_items:
+                    if validate_news_item(item):
+                        valid_news.append(item)
+                    else:
+                        logger.warning(f"Invalid news item from yfinance")
             
-            logger.info(f"Found {len(valid_news)} valid news articles after validation")
-            
+            # If no valid news from Yahoo Finance, try MarketWatch
             if not valid_news:
-                st.warning(f"Unable to retrieve news data for {ticker_symbol}.")
-                st.info("This could be due to:")
-                st.write("1. Rate limiting from data providers")
-                st.write("2. Network connectivity issues")
-                st.write("3. Temporary service disruption")
+                logger.info("Insufficient news items, trying alternative sources")
+                marketwatch_news = get_marketwatch_news(ticker_symbol)
                 
-                # Show alternative sources with direct news links
-                st.write("\nYou can check these sources directly:")
-                col1, col2 = st.columns(2)
+                if marketwatch_news:
+                    valid_news.extend(marketwatch_news)
+                    logger.info(f"Found {len(marketwatch_news)} valid MarketWatch articles")
+            
+            if valid_news:
+                # Sort news by date if available
+                try:
+                    valid_news.sort(key=lambda x: datetime.strptime(x['published'], '%Y-%m-%d %H:%M:%S'), reverse=True)
+                except Exception as e:
+                    logger.warning(f"Error sorting news by date: {str(e)}")
                 
-                with col1:
-                    st.markdown(f"[Yahoo Finance {ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol}/news)")
-                    st.markdown(f"[MarketWatch {ticker_symbol}](https://www.marketwatch.com/investing/stock/{ticker_symbol}/news)")
-                
-                with col2:
-                    st.markdown(f"[Reuters {ticker_symbol}](https://www.reuters.com/markets/companies/{ticker_symbol}.O)")
-                    st.markdown(f"[Seeking Alpha {ticker_symbol}](https://seekingalpha.com/symbol/{ticker_symbol}/news)")
-                
-                return
-            
-            # Sort news by date (most recent first)
-            valid_news.sort(key=lambda x: x.get('providerPublishTime', 0), reverse=True)
-            
-            # Create tabs for different analyses
-            news_tabs = st.tabs(['Recent News', 'Sentiment Analysis', 'News Impact'])
-            
-            with news_tabs[0]:
-                show_recent_news(valid_news)
-            
-            with news_tabs[1]:
-                show_sentiment_analysis(valid_news, ticker_symbol)
-            
-            with news_tabs[2]:
-                # Get historical data for the past month
-                end_date = datetime.now()
-                start_date = end_date - timedelta(days=30)
-                hist = stock.history(start=start_date, end=end_date)
-                show_news_impact(valid_news, hist, ticker_symbol)
+                # Display news articles in a modern card layout
+                for article in valid_news:
+                    with st.container():
+                        # Create a card-like container using Streamlit's native components
+                        col1 = st.container()
+                        with col1:
+                            # Display title
+                            st.markdown(f"### {article['title']}")
+                            
+                            # Display metadata (date and publisher)
+                            st.markdown(
+                                f"📅 {article.get('published', 'No date available')} | "
+                                f"📰 {article['publisher']}"
+                            )
+                            
+                            # Display summary if available
+                            if article.get('summary'):
+                                st.markdown(article['summary'])
+                            
+                            # Use markdown for the link instead of a button
+                            st.markdown(f"[Read More →]({article['link']})")
+                        
+                        # Add some spacing between articles
+                        st.markdown("---")
+            else:
+                st.warning(
+                    """No news articles could be retrieved at this moment. This may be due to:
+                    - Rate limiting from our data sources
+                    - Temporary service disruption
+                    - Network connectivity issues
+                    
+                    Please try again in a few minutes. In the meantime, you can:
+                    - Check the stock's technical analysis
+                    - Review financial metrics
+                    - Explore the company overview"""
+                )
                 
     except Exception as e:
-        logger.error(f"Error in show_news_sentiment: {str(e)}\n{traceback.format_exc()}")
-        st.error("Error fetching news data. Please try again later.")
-        
-        # Show a more user-friendly error message
-        st.info("While we're experiencing technical difficulties, you can:")
-        st.write("1. Refresh the page")
-        st.write("2. Check your internet connection")
-        st.write("3. Try again in a few minutes")
-        st.write("4. Visit the news sources directly using the links below")
-        
-        # Show direct links to news sections
-        st.markdown(f"[Yahoo Finance {ticker_symbol}](https://finance.yahoo.com/quote/{ticker_symbol}/news)")
-        st.markdown(f"[MarketWatch {ticker_symbol}](https://www.marketwatch.com/investing/stock/{ticker_symbol}/news)")
-        st.markdown(f"[Seeking Alpha {ticker_symbol}](https://seekingalpha.com/symbol/{ticker_symbol}/news)")
+        logger.error(f"Error in show_news_sentiment: {str(e)}")
+        st.error(
+            """Unable to fetch news articles. This could be due to:
+            - Service disruption
+            - Network connectivity issues
+            - Rate limiting
+            
+            Please try again later."""
+        )
 
 def show_recent_news(news):
     """Display recent news articles."""

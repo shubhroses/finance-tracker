@@ -1,109 +1,47 @@
 import streamlit as st
-import yfinance as yf
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
-from datetime import datetime
+from .utils import get_stock_history
 
-def show_price_charts(ticker_symbol, period):
-    """Display price and volume charts."""
+def show_price_charts(ticker_symbol, period="1y"):
+    # Get historical data with rate limiting
+    df = get_stock_history(ticker_symbol, period)
     
-    st.header('Price Charts')
-    
-    try:
-        # Get historical data
-        stock = yf.Ticker(ticker_symbol)
-        hist = stock.history(period=period)
-        
-        if not hist.empty:
-            # Create figure with secondary y-axis
-            fig = make_subplots(rows=2, cols=1, 
-                              shared_xaxes=True,
-                              vertical_spacing=0.03,
-                              subplot_titles=('Price', 'Volume'),
-                              row_heights=[0.7, 0.3])
+    if df is None or df.empty:
+        st.error(f"Unable to fetch price data for {ticker_symbol}. Please try again later.")
+        return
 
-            # Add candlestick chart
-            fig.add_trace(
-                go.Candlestick(
-                    x=hist.index,
-                    open=hist['Open'],
-                    high=hist['High'],
-                    low=hist['Low'],
-                    close=hist['Close'],
-                    name='OHLC'
-                ),
-                row=1, col=1
-            )
+    # Create figure with secondary y-axis
+    fig = make_subplots(rows=2, cols=1, shared_xaxes=True,
+                       vertical_spacing=0.03, 
+                       row_heights=[0.7, 0.3])
 
-            # Add volume bar chart
-            colors = ['red' if row['Open'] > row['Close'] else 'green' for index, row in hist.iterrows()]
-            fig.add_trace(
-                go.Bar(
-                    x=hist.index,
-                    y=hist['Volume'],
-                    name='Volume',
-                    marker_color=colors
-                ),
-                row=2, col=1
-            )
+    # Add candlestick chart
+    fig.add_trace(go.Candlestick(x=df.index,
+                                open=df['Open'],
+                                high=df['High'],
+                                low=df['Low'],
+                                close=df['Close'],
+                                name='OHLC'),
+                  row=1, col=1)
 
-            # Update layout
-            fig.update_layout(
-                xaxis_rangeslider_visible=False,
-                height=800,
-                template='plotly_dark',
-                showlegend=False
-            )
+    # Add volume bar chart
+    fig.add_trace(go.Bar(x=df.index, 
+                        y=df['Volume'],
+                        name='Volume',
+                        marker_color='rgba(0,0,255,0.3)'),
+                  row=2, col=1)
 
-            # Update y-axes labels
-            fig.update_yaxes(title_text="Price ($)", row=1, col=1)
-            fig.update_yaxes(title_text="Volume", row=2, col=1)
+    # Update layout
+    fig.update_layout(
+        title=f'{ticker_symbol} Stock Price',
+        yaxis_title='Stock Price (USD)',
+        yaxis2_title='Volume',
+        xaxis_rangeslider_visible=False,
+        height=800
+    )
 
-            st.plotly_chart(fig, use_container_width=True)
-
-            # Add price statistics
-            col1, col2, col3 = st.columns(3)
-            
-            with col1:
-                st.metric(
-                    "Current",
-                    f"${hist['Close'][-1]:.2f}",
-                    f"{((hist['Close'][-1] - hist['Close'][-2]) / hist['Close'][-2] * 100):.2f}%"
-                )
-            
-            with col2:
-                st.metric(
-                    "Period High",
-                    f"${hist['High'].max():.2f}"
-                )
-            
-            with col3:
-                st.metric(
-                    "Period Low",
-                    f"${hist['Low'].min():.2f}"
-                )
-
-            # Add volume statistics
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                st.metric(
-                    "Average Volume",
-                    f"{hist['Volume'].mean():,.0f}"
-                )
-            
-            with col2:
-                st.metric(
-                    "Max Volume",
-                    f"{hist['Volume'].max():,.0f}"
-                )
-
-        else:
-            st.error("No historical data available for the selected period.")
-
-    except Exception as e:
-        st.error(f"Error displaying price charts: {str(e)}")
-        st.info("Unable to load price chart data. Please try again later.")
+    st.plotly_chart(fig, use_container_width=True)
 
 
 def highlight_significant_price_changes(fig, hist, row=1, col=1):

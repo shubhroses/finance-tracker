@@ -8,6 +8,10 @@ from components.financials import show_financial_metrics
 from components.comparison import show_stock_comparison
 from components.portfolio import show_portfolio_analyzer
 from components.news import show_news_sentiment
+from components.utils import get_stock_info
+
+# Disable file watcher in production
+st.set_option('server.fileWatcherType', 'none')
 
 # Set page config
 st.set_page_config(
@@ -54,7 +58,6 @@ st.markdown("""
     }
     
     .stTabs [data-baseweb="tab-list"] {
-    .stTabs > div > div > div > div {
         background-color: #1E2127;
         border-radius: 5px;
         padding: 1rem;
@@ -167,48 +170,50 @@ def main():
     
     if ticker_symbol:
         try:
-            # Get stock data
-            stock = yf.Ticker(ticker_symbol)
-            info = stock.info
+            # Get stock data with rate limiting
+            info = get_stock_info(ticker_symbol)
             
-            # Display header with company info
-            col1, col2, col3 = st.columns([1, 2, 1])
-            with col2:
-                st.title(f"{info.get('longName', ticker_symbol)} ({ticker_symbol})")
+            if info:
+                # Display header with company info
+                col1, col2, col3 = st.columns([1, 2, 1])
+                with col2:
+                    st.title(f"{info.get('longName', ticker_symbol)} ({ticker_symbol})")
             
-            if tab_selection == "Stock Analysis":
-                # Create tabs for different analyses
-                tabs = st.tabs([
-                    "📊 Overview",
-                    "📈 Charts",
-                    "📉 Technical Analysis",
-                    "💰 Financials",
-                    "📰 News & Sentiment"
-                ])
-                
-                with tabs[0]:
-                    show_company_overview(ticker_symbol, info)
-                
-                with tabs[1]:
-                    show_price_charts(ticker_symbol, period)
-                
-                with tabs[2]:
-                    # Get technical indicators from sidebar inputs
-                    technical_indicators = {
-                        'ma_periods': sidebar_inputs.get('ma_periods', []),
-                        'show_rsi': sidebar_inputs.get('show_rsi', False),
-                        'show_macd': sidebar_inputs.get('show_macd', False),
-                        'show_bollinger': sidebar_inputs.get('show_bollinger', False),
-                        'show_volatility': sidebar_inputs.get('show_volatility', False),
-                        'show_drawdown': sidebar_inputs.get('show_drawdown', False)
-                    }
-                    show_technical_analysis(ticker_symbol, period, technical_indicators)
-                
-                with tabs[3]:
-                    show_financial_metrics(ticker_symbol, info)
-                
-                with tabs[4]:
-                    show_news_sentiment(ticker_symbol)
+                if tab_selection == "Stock Analysis":
+                    # Create tabs for different analyses
+                    tabs = st.tabs([
+                        "📊 Overview",
+                        "📈 Charts",
+                        "📉 Technical Analysis",
+                        "💰 Financials",
+                        "📰 News & Sentiment"
+                    ])
+                    
+                    with tabs[0]:
+                        show_company_overview(ticker_symbol, info)
+                    
+                    with tabs[1]:
+                        show_price_charts(ticker_symbol, period)
+                    
+                    with tabs[2]:
+                        # Get technical indicators from sidebar inputs
+                        technical_indicators = {
+                            'ma_periods': sidebar_inputs.get('ma_periods', []),
+                            'show_rsi': sidebar_inputs.get('show_rsi', False),
+                            'show_macd': sidebar_inputs.get('show_macd', False),
+                            'show_bollinger': sidebar_inputs.get('show_bollinger', False),
+                            'show_volatility': sidebar_inputs.get('show_volatility', False),
+                            'show_drawdown': sidebar_inputs.get('show_drawdown', False)
+                        }
+                        show_technical_analysis(ticker_symbol, period, technical_indicators)
+                    
+                    with tabs[3]:
+                        show_financial_metrics(ticker_symbol, info)
+                    
+                    with tabs[4]:
+                        show_news_sentiment(ticker_symbol)
+            else:
+                st.error(f"Unable to fetch data for {ticker_symbol}. Please try again later.")
         
         except Exception as e:
             st.error(f"Error fetching data for {ticker_symbol}: {str(e)}")
