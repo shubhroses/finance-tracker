@@ -12,7 +12,7 @@ The sidebar switches between three modes.
 
 ### Stock Analysis
 
-Enter a ticker (default `AAPL`) and choose a period (`1mo`, `3mo`, `6mo`, `1y`, `2y`, `5y` or `max`; default `1y`). With the ticker box empty the page shows a short welcome text instead. Otherwise it shows the five tabs below. A symbol Yahoo Finance does not recognise still gets the tabs, with error messages in place of data. If the company lookup itself returns nothing, a single error message replaces the tabs.
+Enter a ticker (default `AAPL`) and choose a period (`1mo`, `3mo`, `6mo`, `1y`, `2y`, `5y` or `max`; default `1y`). With the ticker box empty the page shows a short welcome text instead. Otherwise it shows the five tabs below. A symbol Yahoo Finance does not recognise still gets the tabs, showing `N/A` and error messages in place of data. If the company lookup itself returns nothing, a single error message replaces the tabs.
 
 | Tab | Contents |
 | --- | --- |
