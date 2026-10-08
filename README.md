@@ -57,8 +57,8 @@ Portfolio figures use one year of daily prices. The purchase price is the close 
 `components/utils.py` wraps the calls behind the Overview, Charts, Financials and News tabs:
 
 - Results are cached for five minutes with `st.cache_data`. A lookup that failed and returned nothing is cached as well.
-- A limiter shared by the whole server process keeps at least two seconds between the start of one uncached call and the next.
-- Company info and news lookups make up to five attempts when the result is empty or the error message contains `429`, waiting about 4, 8, 16 and 32 seconds between attempts plus up to half a second of random jitter. Any other error ends the lookup at once. Price history and financial statements are requested once.
+- A limiter shared by the whole server process keeps at least two seconds between the start of one uncached call and the next. It takes no lock, so two sessions waiting on it at the same moment are released together.
+- Company info and news lookups make up to five attempts, waiting about 4, 8, 16 and 32 seconds between attempts plus up to half a second of random jitter. The company info lookup tries again when the result is empty or the error message contains `429`, and any other error ends it at once. The news lookup tries again whenever an attempt finds no headlines: an error raised by `yfinance` or by the page scrape is logged and counted as an empty result. Price history and financial statements are requested once.
 - Page scraping goes through a shared `requests.Session` that retries GET requests up to five times on 429, 500, 502, 503 and 504 responses. The helpers also assign this session to a `_session` attribute on the `yfinance` ticker object. yfinance 1.7.0 does not read that attribute, so its own requests are unaffected.
 
 News is looked up in this order: `yfinance`; then a scrape of the ticker's news page on Yahoo Finance; then, if there is still nothing usable, a scrape of the ticker's page on MarketWatch.
@@ -128,7 +128,7 @@ Code that is present but never called:
 
 ## Known issues
 
-Found on 8 October 2026 by running the script through Streamlit's `AppTest` harness on Python 3.13 with the versions above, using the default inputs unless stated. The news, dividend yield and portfolio results were the same on Python 3.10 and 3.14. The pages were not inspected in a browser.
+Found on 8 October 2026 by running the script through Streamlit's `AppTest` harness on Python 3.13 with the versions above, using the default inputs unless stated. The news, dividend yield and portfolio results were the same on Python 3.10 and 3.14. In a browser, only the Overview tab of the default Stock Analysis page and the Performance tab of Portfolio Analysis were opened, and both showed the same figures; nothing else was inspected in a browser.
 
 - **The news tab came back empty.** `yfinance` returned no news items (Yahoo answered its request with HTTP 404), the Yahoo Finance page scrape matched no elements, and MarketWatch answered HTTP 401. The tab showed its "No news articles could be retrieved" warning. The retry waits described above made the first run for a ticker take about 75 seconds.
 - **Dividend yield is shown 100 times too large.** `yfinance` reported `dividendYield` already as a percentage (0.32 for AAPL). The Financials tab, the Compare Stocks table and the portfolio holdings table multiply it by 100 again and showed 32.00%. The portfolio-level "Dividend Yield" figure does not rescale it and is unaffected.
