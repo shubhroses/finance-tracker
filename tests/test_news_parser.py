@@ -69,6 +69,24 @@ def test_same_article_gives_the_same_headline_fields_in_both_layouts(flat_items,
         assert flat[field] == nested[field]
 
 
+def test_nested_item_links_to_the_click_through_url_before_the_canonical_one(nested_items):
+    # Yahoo often hosts a copy of an article that a publisher ran first. The
+    # item then carries two addresses: clickThroughUrl is Yahoo's copy and
+    # canonicalUrl the publisher's page.
+    content = nested_items[0]['content']
+    content['canonicalUrl']['url'] = 'https://www.examplewire.example/2025/01/01/example-corp-raises-outlook'
+
+    assert parse_news_item(nested_items[0])['link'] == (
+        'https://finance.example.com/news/example-corp-raises-outlook-100000001.html'
+    )
+
+
+def test_nested_item_type_is_its_content_type(nested_items):
+    nested_items[0]['content']['contentType'] = 'VIDEO'
+
+    assert parse_news_item(nested_items[0])['type'] == 'VIDEO'
+
+
 def test_nested_item_without_click_through_url_links_to_the_publisher(nested_items):
     item = nested_items[1]
     assert item['content']['clickThroughUrl'] is None
