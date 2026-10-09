@@ -7,7 +7,9 @@ from plotly.subplots import make_subplots
 import logging
 import traceback
 from datetime import datetime
-from . import indicators
+# Imported as "calculations" because show_technical_analysis already has a
+# parameter called "indicators" (the sidebar settings).
+from . import indicators as calculations
 
 # Configure logging
 logging.basicConfig(
@@ -96,7 +98,7 @@ def show_moving_averages(hist, ma_periods):
     
     # Add moving averages to the data
     for period in ma_periods:
-        hist[f'MA_{period}'] = indicators.calculate_sma(hist['Close'], period)
+        hist[f'MA_{period}'] = calculations.calculate_sma(hist['Close'], period)
     
     # Check for golden cross and death cross
     if 'MA_50' in hist.columns and 'MA_200' in hist.columns:
@@ -377,7 +379,7 @@ def show_volatility_indicators(hist, show_bollinger=False, show_volatility=False
     
     if show_bollinger:
         # Calculate Bollinger Bands
-        bands = indicators.calculate_bollinger_bands(hist['Close'], window=20, num_std=2)
+        bands = calculations.calculate_bollinger_bands(hist['Close'], window=20, num_std=2)
         hist['MA_20'] = bands['Middle']
         hist['Upper_Band'] = bands['Upper']
         hist['Lower_Band'] = bands['Lower']
@@ -658,9 +660,9 @@ def show_support_resistance(hist):
 # The calculations are in indicators.py, which imports no Streamlit. Wrapped
 # here, a failure in one of them is logged and shown on the page, and the
 # call returns None.
-calculate_rsi = log_function_call(indicators.calculate_rsi)
-calculate_macd = log_function_call(indicators.calculate_macd)
-calculate_atr = log_function_call(indicators.calculate_atr)
+calculate_rsi = log_function_call(calculations.calculate_rsi)
+calculate_macd = log_function_call(calculations.calculate_macd)
+calculate_atr = log_function_call(calculations.calculate_atr)
 
 
 def identify_pivot_points(df, window=10):
