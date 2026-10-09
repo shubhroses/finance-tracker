@@ -7,6 +7,7 @@ from plotly.subplots import make_subplots
 import logging
 import traceback
 from datetime import datetime
+from . import indicators
 
 # Configure logging
 logging.basicConfig(
@@ -95,7 +96,7 @@ def show_moving_averages(hist, ma_periods):
     
     # Add moving averages to the data
     for period in ma_periods:
-        hist[f'MA_{period}'] = hist['Close'].rolling(window=period).mean()
+        hist[f'MA_{period}'] = indicators.calculate_sma(hist['Close'], period)
     
     # Check for golden cross and death cross
     if 'MA_50' in hist.columns and 'MA_200' in hist.columns:
@@ -264,8 +265,11 @@ def show_oscillators(hist, show_rsi=False, show_macd=False):
     
     if show_macd:
         # Calculate MACD
-        calculate_macd(hist)
-        
+        macd = calculate_macd(hist['Close'])
+        if macd is not None:
+            for column in ('MACD', 'Signal', 'Histogram'):
+                hist[column] = macd[column]
+
         if 'MACD' in hist.columns and 'Signal' in hist.columns and 'Histogram' in hist.columns:
             fig.add_trace(
                 go.Scatter(
@@ -373,9 +377,10 @@ def show_volatility_indicators(hist, show_bollinger=False, show_volatility=False
     
     if show_bollinger:
         # Calculate Bollinger Bands
-        hist['MA_20'] = hist['Close'].rolling(window=20).mean()
-        hist['Upper_Band'] = hist['MA_20'] + (hist['Close'].rolling(window=20).std() * 2)
-        hist['Lower_Band'] = hist['MA_20'] - (hist['Close'].rolling(window=20).std() * 2)
+        bands = indicators.calculate_bollinger_bands(hist['Close'], window=20, num_std=2)
+        hist['MA_20'] = bands['Middle']
+        hist['Upper_Band'] = bands['Upper']
+        hist['Lower_Band'] = bands['Lower']
         
         # Create figure for Bollinger Bands
         bb_fig = go.Figure()
@@ -650,71 +655,12 @@ def show_support_resistance(hist):
 
 # Helper functions for technical analysis
 
-@log_function_call
-def calculate_rsi(prices, periods=14):
-    """Calculate Relative Strength Index."""
-    logger.info(f"Calculating RSI with period {periods}")
-    
-    try:
-        delta = prices.diff()
-        gain = delta.clip(lower=0)
-        loss = -delta.clip(upper=0)
-        avg_gain = gain.rolling(window=periods).mean()
-        avg_loss = loss.rolling(window=periods).mean()
-        rs = avg_gain / avg_loss
-        rsi = 100 - (100 / (1 + rs))
-        
-        logger.info("RSI calculation completed successfully")
-        return rsi
-    
-    except Exception as e:
-        logger.error(f"Error calculating RSI: {str(e)}\n{traceback.format_exc()}")
-        raise
-
-
-@log_function_call
-def calculate_macd(df, fast=12, slow=26, signal=9):
-    """Calculate MACD, Signal, and Histogram for a given dataframe."""
-    logger.info(f"Calculating MACD with fast={fast}, slow={slow}, signal={signal}")
-    
-    try:
-        df['EMA_fast'] = df['Close'].ewm(span=fast, adjust=False).mean()
-        df['EMA_slow'] = df['Close'].ewm(span=slow, adjust=False).mean()
-        df['MACD'] = df['EMA_fast'] - df['EMA_slow']
-        df['Signal'] = df['MACD'].ewm(span=signal, adjust=False).mean()
-        df['Histogram'] = df['MACD'] - df['Signal']
-        
-        logger.info("MACD calculation completed successfully")
-        return df
-    
-    except Exception as e:
-        logger.error(f"Error calculating MACD: {str(e)}\n{traceback.format_exc()}")
-        raise
-
-
-@log_function_call
-def calculate_atr(df, window=14):
-    """Calculate Average True Range."""
-    logger.info(f"Calculating ATR with window {window}")
-    
-    try:
-        high = df['High']
-        low = df['Low']
-        close = df['Close'].shift(1)
-        
-        tr1 = high - low
-        tr2 = abs(high - close)
-        tr3 = abs(low - close)
-        
-        tr = pd.DataFrame({'tr1': tr1, 'tr2': tr2, 'tr3': tr3}).max(axis=1)
-        atr = tr.rolling(window=window).mean()
-        
-        logger.info("ATR calculation completed successfully")
-        return atr
-    
-    except Exception as e:
-        logger.error(f"Error calculating ATR: {str(e)}\n{traceback.format_exc()}")
-        raise
+# The calculations are in indicators.py, which imports no Streamlit. Wrapped
+# here, a failure in one of them is logged and shown on the page, and the
+# call returns None.
+calculate_rsi = log_function_call(indicators.calculate_rsi)
+calculate_macd = log_function_call(indicators.calculate_macd)
+calculate_atr = log_function_call(indicators.calculate_atr)
 
 
 def identify_pivot_points(df, window=10):

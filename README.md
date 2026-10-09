@@ -114,6 +114,8 @@ The tests make no network calls.
 
 `tests/test_news_sources.py` replaces `yfinance`, the HTTP session and the waits with fakes and checks the order in which the news lookup tries its sources.
 
+`tests/test_indicators.py` checks the moving average, RSI, MACD, Bollinger Bands and ATR functions in `components/indicators.py`, which the Technical Analysis tab calls, on price series short enough to work out by hand. The working is in comments beside the expected values. The Compare Stocks mode has its own copies of the RSI and MACD formulas in `components/comparison.py`, which these tests do not reach.
+
 ## Deploying
 
 The app reads no secrets or environment variables. A host only has to install `requirements.txt` and run `app.py` with Streamlit. For Streamlit Community Cloud, follow [Deploy your app on Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy) with a fork of this repository. Deployment was not tried while writing this README.
@@ -131,7 +133,8 @@ finance-tracker/
 │   ├── sidebar.py         # Mode, ticker, period and indicator controls
 │   ├── overview.py        # Overview tab
 │   ├── charts.py          # Candlestick and volume chart
-│   ├── technical.py       # Moving averages, RSI, MACD, Bollinger Bands, volatility, ATR, support/resistance
+│   ├── technical.py       # Technical Analysis tab: charts, readings, volatility, support/resistance
+│   ├── indicators.py      # Moving average, RSI, MACD, Bollinger Bands and ATR calculations; no Streamlit imports
 │   ├── financials.py      # Key metrics and financial statements
 │   ├── news.py            # News tab and the MarketWatch scrape
 │   ├── news_parser.py     # Reads both layouts of a yfinance news item; no Streamlit imports
@@ -139,6 +142,7 @@ finance-tracker/
 │   ├── portfolio.py       # Portfolio Analysis mode
 │   └── utils.py           # Cached, rate-limited yfinance helpers and the shared requests session
 ├── tests/
+│   ├── test_indicators.py
 │   ├── test_news_parser.py
 │   ├── test_news_sources.py
 │   └── fixtures/          # One sample of each news item layout
@@ -170,7 +174,7 @@ Found on 8 October 2026 by running the script through Streamlit's `AppTest` harn
 
 - `yfinance` is not affiliated with or endorsed by Yahoo. Requests can be rate-limited or fail when Yahoo changes its site, and the scrapers depend on page markup that changes without notice.
 - Holdings are typed in each session; nothing is saved.
-- The automated tests cover the news item parser and the order of the news sources only. See [Tests](#tests).
+- The automated tests cover the news item parser, the order of the news sources and the indicator calculations behind the Technical Analysis tab. The Streamlit views and the financial statement, comparison and portfolio code have no tests. See [Tests](#tests).
 - The readings shown next to indicators ("bullish", "overbought" and so on) are the textbook interpretations of those indicators. Nothing in the app is investment advice.
 
 ## License
