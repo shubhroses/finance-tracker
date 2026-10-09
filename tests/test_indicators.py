@@ -159,6 +159,30 @@ def test_bollinger_middle_band_is_the_moving_average():
     assert bands.iloc[:7].isna().all().all()
 
 
+def test_bollinger_bands_use_the_population_standard_deviation():
+    prices = pd.Series([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0])
+    # The mean is 5. The squared distances from it, 9 1 1 1 0 0 4 16, sum to
+    # 32, so the population variance is 32/8 = 4 and the deviation is 2.
+    # Two deviations either side of 5 are 9 and 1. (The sample form, 32/7,
+    # would give a deviation of 2.14 and bands at 9.28 and 0.72.)
+    last = calculate_bollinger_bands(prices, window=8, num_std=2).iloc[-1]
+
+    assert last['Middle'] == pytest.approx(5.0)
+    assert last['Upper'] == pytest.approx(9.0)
+    assert last['Lower'] == pytest.approx(1.0)
+
+
+def test_bollinger_default_bands_on_twenty_prices():
+    prices = pd.Series([8.0] * 10 + [12.0] * 10)
+    # The mean is 10 and every price is 2 away from it, so the population
+    # deviation is 2 and the default (20, 2) bands are 10 - 4 and 10 + 4.
+    last = calculate_bollinger_bands(prices).iloc[-1]
+
+    assert last['Middle'] == pytest.approx(10.0)
+    assert last['Upper'] == pytest.approx(14.0)
+    assert last['Lower'] == pytest.approx(6.0)
+
+
 def test_bollinger_bands_are_the_same_distance_either_side_of_the_middle():
     prices = pd.Series([2.0, 4.0, 4.0, 4.0, 5.0, 5.0, 7.0, 9.0, 11.0])
 

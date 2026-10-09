@@ -63,14 +63,16 @@ def calculate_bollinger_bands(prices, window=20, num_std=2):
 
     The middle band is the ``window``-period simple moving average. The upper
     and lower bands are ``num_std`` standard deviations of the same
-    ``window`` values above and below it.
+    ``window`` values above and below it. Bollinger Bands are defined with
+    the population standard deviation (divisor ``window``, not
+    ``window - 1``), so ``ddof=0`` replaces the pandas default.
 
     Returns a DataFrame with the columns Middle, Upper and Lower. The first
     ``window - 1`` rows are NaN.
     """
     rolling = prices.rolling(window=window)
     middle = rolling.mean()
-    offset = rolling.std() * num_std
+    offset = rolling.std(ddof=0) * num_std
     return pd.DataFrame({
         'Middle': middle,
         'Upper': middle + offset,

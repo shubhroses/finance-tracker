@@ -29,7 +29,7 @@ Technical Analysis sub-tabs. Checkboxes in the sidebar, all ticked by default, c
 - **Volatility** ("Show Bollinger Bands", "Show Volatility"): Bollinger Bands (20, 2) with current versus average band width; 20-day annualised historical volatility; ATR (14).
 - **Support/Resistance** (always shown): pivot highs and lows, where a pivot is a bar whose high is above, or whose low is below, that of each of the 10 bars before and after it. Neighbouring pivot prices within 1% of each other are grouped, and each group of two or more is reported as a level at the group's average price. Levels within 15% of the last close are drawn on the chart, and up to three of the nearest levels on each side of the last close are listed.
 
-RSI and ATR are computed with simple rolling means rather than Wilder's smoothing.
+RSI and ATR are computed with simple rolling means rather than Wilder's smoothing. The Bollinger Bands use the population standard deviation of the 20 closes (divisor 20, not 19), as John Bollinger defines them.
 
 ### Compare Stocks
 
