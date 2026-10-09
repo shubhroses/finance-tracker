@@ -4,7 +4,7 @@ A Streamlit dashboard for looking at a single stock, comparing several tickers s
 
 No API keys or configuration are needed.
 
-The code dates from March 2025. All three modes were last run on 8 October 2026: the server starts and each mode runs with its default inputs, but some figures are wrong. See [Known issues](#known-issues). The news tab came back empty in that run. After the news lookup was changed, the default Stock Analysis page was run again on 9 October 2026 and the tab showed ten headlines.
+The app was written in March 2025. All three modes were run on 8 October 2026: the server starts and each mode runs with its default inputs, but some figures are wrong and the news tab came back empty. On 9 October 2026 the news lookup and the Bollinger Band calculation were corrected, the indicator calculations were moved into a module of their own, and the tests and the CI workflow were added. The three modes were then run again with their default inputs through Streamlit's `AppTest` harness: none showed an error message and the news tab showed ten headlines. The wrong figures were not touched. See [Known issues](#known-issues).
 
 ## What it does
 
@@ -108,7 +108,7 @@ pip install pytest
 python -m pytest
 ```
 
-The tests make no network calls. On 9 October 2026 they passed on Python 3.10.18 and 3.13.7 with the package versions in the table above.
+The tests make no network calls. On 9 October 2026 they passed on Python 3.10.18 and 3.13.7 with the package versions in the table above. The same day they passed in Linux containers on Python 3.12.15, with the versions of the 3.13.7 row, and on Python 3.9.25, where `pip` chose streamlit 1.50.0, yfinance 1.2.0, pandas 2.3.3, numpy 2.0.2 and plotly 7.1.0.
 
 `.github/workflows/ci.yml` runs them on GitHub Actions for every push and pull request: it installs `requirements.txt` and `pytest` on Python 3.12 and runs `python -m pytest`.
 
