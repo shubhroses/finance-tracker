@@ -1,0 +1,107 @@
+[
+  {
+    "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+    "content": {
+      "id": "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "contentType": "STORY",
+      "title": "Example Corp raises its full-year outlook",
+      "description": "",
+      "summary": "The company now expects revenue to grow 12% this year.",
+      "pubDate": "2025-01-01T01:00:00Z",
+      "displayTime": "2025-01-01T01:05:00Z",
+      "isHosted": true,
+      "bypassModal": false,
+      "previewUrl": null,
+      "thumbnail": {
+        "originalUrl": "https://media.example.com/images/outlook.jpg",
+        "originalWidth": 1400,
+        "originalHeight": 840,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://media.example.com/images/outlook.jpg",
+            "width": 1400,
+            "height": 840,
+            "tag": "original"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Example Wire",
+        "url": "https://www.examplewire.example/"
+      },
+      "canonicalUrl": {
+        "url": "https://finance.example.com/news/example-corp-raises-outlook-100000001.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": {
+        "url": "https://finance.example.com/news/example-corp-raises-outlook-100000001.html",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  },
+  {
+    "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+    "content": {
+      "id": "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      "contentType": "STORY",
+      "title": "Chip makers lead a broad market rally",
+      "description": "",
+      "summary": "Semiconductor shares rose for a third session.",
+      "pubDate": "2025-01-01T00:00:00Z",
+      "displayTime": "2025-01-01T00:00:00Z",
+      "isHosted": false,
+      "bypassModal": false,
+      "previewUrl": "https://finance.example.com/m/bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb/chip-makers-lead.html",
+      "thumbnail": {
+        "originalUrl": "https://media.example.com/images/chips.jpg",
+        "originalWidth": 1200,
+        "originalHeight": 800,
+        "caption": "",
+        "resolutions": [
+          {
+            "url": "https://media.example.com/images/chips.jpg",
+            "width": 1200,
+            "height": 800,
+            "tag": "original"
+          }
+        ]
+      },
+      "provider": {
+        "displayName": "Sample Journal",
+        "url": "https://www.samplejournal.example/"
+      },
+      "canonicalUrl": {
+        "url": "https://www.samplejournal.example/articles/chip-makers-lead-a-broad-market-rally",
+        "site": "finance",
+        "region": "US",
+        "lang": "en-US"
+      },
+      "clickThroughUrl": null,
+      "metadata": {
+        "editorsPick": false
+      },
+      "finance": {
+        "premiumFinance": {
+          "isPremiumNews": false,
+          "isPremiumFreeNews": false
+        }
+      },
+      "storyline": null
+    }
+  }
+]

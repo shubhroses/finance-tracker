@@ -12,6 +12,7 @@ from bs4 import BeautifulSoup
 import json
 import time
 from .utils import get_stock_news, get_session
+from .news_parser import parse_news_items
 import random
 
 # Configure logging
@@ -370,58 +371,17 @@ def show_news_sentiment(ticker_symbol):
             
             if news_items:
                 logger.info(f"Found {len(news_items)} news items from yfinance")
-                
-                for item in news_items:
-                    # Log the item structure for debugging
-                    logger.info(f"Processing news item with keys: {list(item.keys())}")
-                    
-                    # Try to extract title from different fields
-                    title = None
-                    if isinstance(item, dict):
-                        # Try multiple fields for title
-                        for field in ['title', 'headline', 'Title', 'Headline']:
-                            if field in item and item[field]:
-                                title = item[field]
-                                break
-                        
-                        # If no title found, try using the first sentence of description/summary
-                        if not title:
-                            for field in ['description', 'summary', 'Description', 'Summary']:
-                                if field in item and item[field]:
-                                    title = item[field].split('.')[0].strip()
-                                    break
-                    
-                    # If we found a title, create a valid news item
-                    if title:
-                        # Try multiple fields for link/url
-                        link = None
-                        for field in ['link', 'url', 'Link', 'URL']:
-                            if field in item and item[field]:
-                                link = item[field]
-                                break
-                        
-                        if not link:
-                            logger.warning(f"No link found for news item with title: {title}")
-                            continue
-                        
-                        # Create the news item with all available fields
-                        valid_item = {
-                            'title': title,
-                            'link': link,
-                            'publisher': item.get('publisher', 'Yahoo Finance'),
-                            'published': format_date(item.get('providerPublishTime', datetime.now().timestamp())),
-                            'summary': item.get('description', item.get('summary', '')),
-                            'type': item.get('type', 'STORY')
-                        }
-                        
-                        if validate_news_item(valid_item):
-                            valid_news.append(valid_item)
-                            logger.info(f"Added valid news item: {valid_item['title']}")
-                        else:
-                            logger.warning(f"Invalid news item: {valid_item}")
-                    else:
-                        logger.warning("Could not find title in news item")
-            
+
+                # parse_news_items accepts both item layouts yfinance has used,
+                # drops items with no title or link and sorts newest first
+                for article in parse_news_items(news_items):
+                    # Show the publish time in the server's local time
+                    published = article['published']
+                    article['published'] = format_date(published.timestamp()) if published else None
+                    valid_news.append(article)
+
+                logger.info(f"{len(valid_news)} of {len(news_items)} news items have a title and a link")
+
             # If no valid news from Yahoo Finance, try MarketWatch
             if not valid_news:
                 logger.info("No valid news items from Yahoo Finance, trying MarketWatch")
@@ -432,12 +392,8 @@ def show_news_sentiment(ticker_symbol):
                     logger.info(f"Added {len(marketwatch_news)} valid MarketWatch articles")
             
             if valid_news:
-                # Sort news by date if available
-                try:
-                    valid_news.sort(key=lambda x: datetime.strptime(x['published'], '%Y-%m-%d %H:%M:%S'), reverse=True)
-                except Exception as e:
-                    logger.warning(f"Error sorting news by date: {str(e)}")
-                
+                # Both sources arrive sorted newest first: parse_news_items
+                # sorts the yfinance items and get_marketwatch_news its own.
                 # Display news articles in a modern card layout
                 for article in valid_news:
                     with st.container():
@@ -449,7 +405,7 @@ def show_news_sentiment(ticker_symbol):
                             
                             # Display metadata (date and publisher)
                             st.markdown(
-                                f"📅 {article.get('published', 'No date available')} | "
+                                f"📅 {article.get('published') or 'No date available'} | "
                                 f"📰 {article['publisher']}"
                             )
                             

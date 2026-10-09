@@ -63,6 +63,13 @@ Portfolio figures use one year of daily prices. The purchase price is the close 
 
 News is looked up in this order: `yfinance`; then a scrape of the ticker's news page on Yahoo Finance; then, if there is still nothing usable, a scrape of the ticker's page on MarketWatch.
 
+Items from the first two sources are read by `components/news_parser.py`, which accepts both layouts `yfinance` has used for a news item:
+
+- flat, with `title`, `link`, `publisher` and `providerPublishTime` at the top level. `Ticker.news` returned this up to yfinance 0.2.50, and `yfinance.Search(...).news` still does.
+- nested under a `content` key, with `title`, `summary`, `pubDate`, `provider.displayName` and the address in `clickThroughUrl.url`, `canonicalUrl.url` or `previewUrl` (the first one present is used). `Ticker.news` returns this from yfinance 0.2.51 on.
+
+An item with no title or no link is dropped. Headlines are sorted newest first, and the times are shown in the server's local time.
+
 The Technical Analysis tab and the Compare Stocks and Portfolio Analysis modes call `yfinance` directly, without the cache or the limiter.
 
 ## Run locally
@@ -92,6 +99,19 @@ With these versions Streamlit logs a deprecation warning for `use_container_widt
 
 Of the packages in `requirements.txt`, the code imports `streamlit`, `yfinance`, `pandas`, `numpy`, `plotly`, `beautifulsoup4` and `requests`. No module imports `scikit-learn`, `lxml`, `html5lib`, `python-dateutil`, `pytz`, `tenacity` or `watchdog` (Streamlit uses `watchdog` itself when it is installed).
 
+## Tests
+
+With the virtual environment from [Run locally](#run-locally) active:
+
+```bash
+pip install pytest
+python -m pytest
+```
+
+The tests make no network calls.
+
+`tests/test_news_parser.py` checks `components/news_parser.py` against one fixture for each layout of a news item. The fixtures in `tests/fixtures/` use the key names of real items with invented headlines, publishers and addresses. `news_flat.json` follows what `yfinance.Search("AAPL").news` returned on 9 October 2026. `news_nested.json` follows `Ticker.news` output from January and February 2026 that other projects have published, because Yahoo answered the request behind `Ticker.news` with HTTP 404 on the day the fixtures were written.
+
 ## Deploying
 
 The app reads no secrets or environment variables. A host only has to install `requirements.txt` and run `app.py` with Streamlit. For Streamlit Community Cloud, follow [Deploy your app on Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy) with a fork of this repository. Deployment was not tried while writing this README.
@@ -102,6 +122,7 @@ The app reads no secrets or environment variables. A host only has to install `r
 finance-tracker/
 ├── app.py                 # Page config, custom CSS, routing between the three modes
 ├── requirements.txt
+├── pytest.ini             # Test paths and import path for pytest
 ├── LICENSE
 ├── components/
 │   ├── __init__.py
@@ -111,9 +132,13 @@ finance-tracker/
 │   ├── technical.py       # Moving averages, RSI, MACD, Bollinger Bands, volatility, ATR, support/resistance
 │   ├── financials.py      # Key metrics and financial statements
 │   ├── news.py            # News tab and the MarketWatch scrape
+│   ├── news_parser.py     # Reads both layouts of a yfinance news item; no Streamlit imports
 │   ├── comparison.py      # Compare Stocks mode
 │   ├── portfolio.py       # Portfolio Analysis mode
 │   └── utils.py           # Cached, rate-limited yfinance helpers and the shared requests session
+├── tests/
+│   ├── test_news_parser.py
+│   └── fixtures/          # One sample of each news item layout
 └── utils/
     ├── __init__.py
     ├── config.py          # Not imported by the app
@@ -142,7 +167,7 @@ Found on 8 October 2026 by running the script through Streamlit's `AppTest` harn
 
 - `yfinance` is not affiliated with or endorsed by Yahoo. Requests can be rate-limited or fail when Yahoo changes its site, and the scrapers depend on page markup that changes without notice.
 - Holdings are typed in each session; nothing is saved.
-- There are no automated tests.
+- The automated tests cover the news item parser only. See [Tests](#tests).
 - The readings shown next to indicators ("bullish", "overbought" and so on) are the textbook interpretations of those indicators. Nothing in the app is investment advice.
 
 ## License

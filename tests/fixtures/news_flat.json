@@ -1,0 +1,30 @@
+[
+  {
+    "uuid": "11111111-1111-3111-8111-111111111111",
+    "title": "Example Corp raises its full-year outlook",
+    "publisher": "Example Wire",
+    "link": "https://finance.example.com/news/example-corp-raises-outlook-100000001.html",
+    "providerPublishTime": 1735693200,
+    "type": "STORY",
+    "thumbnail": {
+      "resolutions": [
+        {
+          "url": "https://media.example.com/images/outlook.jpg",
+          "width": 1400,
+          "height": 840,
+          "tag": "original"
+        }
+      ]
+    },
+    "relatedTickers": ["EXMP", "AAPL"]
+  },
+  {
+    "uuid": "22222222-2222-3222-8222-222222222222",
+    "title": "Chip makers lead a broad market rally",
+    "publisher": "Sample Journal",
+    "link": "https://finance.example.com/m/22222222-2222-3222-8222-222222222222/chip-makers-lead.html",
+    "providerPublishTime": 1735689600,
+    "type": "STORY",
+    "relatedTickers": ["AAPL"]
+  }
+]
