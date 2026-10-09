@@ -108,7 +108,9 @@ pip install pytest
 python -m pytest
 ```
 
-The tests make no network calls.
+The tests make no network calls. On 9 October 2026 they passed on Python 3.10.18 and 3.13.7 with the package versions in the table above.
+
+`.github/workflows/ci.yml` runs them on GitHub Actions for every push and pull request: it installs `requirements.txt` and `pytest` on Python 3.12 and runs `python -m pytest`.
 
 `tests/test_news_parser.py` checks `components/news_parser.py` against one fixture for each layout of a news item. The fixtures in `tests/fixtures/` use the key names of real items with invented headlines, publishers and addresses. `news_flat.json` follows what `yfinance.Search("AAPL").news` returned on 9 October 2026. `news_nested.json` follows `Ticker.news` output from January and February 2026 that other projects have published, because Yahoo answered the request behind `Ticker.news` with HTTP 404 on the day the fixtures were written.
 
@@ -124,6 +126,8 @@ The app reads no secrets or environment variables. A host only has to install `r
 
 ```
 finance-tracker/
+├── .github/workflows/
+│   └── ci.yml             # Runs the tests on every push and pull request
 ├── app.py                 # Page config, custom CSS, routing between the three modes
 ├── requirements.txt
 ├── pytest.ini             # Test paths and import path for pytest
