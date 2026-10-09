@@ -3,6 +3,7 @@ import time
 import random
 from functools import wraps
 import yfinance as yf
+from .news_parser import related_news
 import pandas as pd
 import logging
 from datetime import datetime, timedelta
@@ -125,9 +126,12 @@ def get_stock_news(ticker_symbol, max_retries=5, initial_delay=2):
             # If the news property is empty, ask Yahoo's search endpoint, which
             # also returns headlines for a symbol (yfinance 0.2.51 and later)
             try:
-                news = yf.Search(ticker_symbol, news_count=10).news
+                found = yf.Search(ticker_symbol, news_count=10).news
+                # The search matches the symbol as text, so keep only the
+                # headlines Yahoo itself tags with this symbol
+                news = related_news(found, ticker_symbol)
                 if news:
-                    logger.info(f"Successfully fetched {len(news)} news items from Yahoo search")
+                    logger.info(f"Kept {len(news)} of {len(found)} news items from Yahoo search")
                     return news
             except Exception as e:
                 logger.warning(f"Error getting news from Yahoo search: {str(e)}")

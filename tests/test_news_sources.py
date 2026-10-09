@@ -16,6 +16,7 @@ FLAT_ITEM = {
     'publisher': 'Example Wire',
     'providerPublishTime': 1735693200,
     'type': 'STORY',
+    'relatedTickers': ['TEST'],
 }
 NESTED_ITEM = {
     'id': 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -114,3 +115,24 @@ def test_lookup_goes_on_to_the_page_scrape_when_yfinance_has_no_search(sources, 
 
     assert utils.get_stock_news('TEST', max_retries=1) is None
     assert kinds(sources.calls) == ['Ticker', 'GET']
+
+
+def test_search_results_that_do_not_list_the_symbol_are_not_shown(sources):
+    # the search endpoint matches the symbol as text: a headline tagged with
+    # other tickers, or with none, is not this ticker's news
+    sources.ticker_news = []
+    sources.search_news = [
+        {**FLAT_ITEM, 'relatedTickers': ['OTHER']},
+        {key: value for key, value in FLAT_ITEM.items() if key != 'relatedTickers'},
+    ]
+
+    assert utils.get_stock_news('TEST', max_retries=1) is None
+    assert kinds(sources.calls) == ['Ticker', 'Search', 'GET']
+
+
+def test_only_the_related_search_results_are_returned(sources):
+    related = {**FLAT_ITEM, 'relatedTickers': ['OTHER', 'test']}
+    sources.ticker_news = []
+    sources.search_news = [{**FLAT_ITEM, 'relatedTickers': ['OTHER']}, related]
+
+    assert utils.get_stock_news('TEST') == [related]

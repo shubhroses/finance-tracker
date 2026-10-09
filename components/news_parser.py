@@ -63,6 +63,21 @@ def parse_news_items(items):
     return articles
 
 
+def related_news(items, symbol):
+    """Keep the search results that list the symbol among their related tickers.
+
+    Yahoo's search endpoint matches the query as text, so a symbol that is also
+    an everyday word (ALL, KEY, NOW) brings back headlines about other things.
+    An item without a ``relatedTickers`` list is dropped.
+    """
+    wanted = str(symbol).upper()
+    return [
+        item
+        for item in items or []
+        if wanted in {str(ticker).upper() for ticker in item.get('relatedTickers') or []}
+    ]
+
+
 def _parse_flat(item):
     return {
         'title': _text(item.get('title')),
