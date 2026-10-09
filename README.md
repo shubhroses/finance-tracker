@@ -4,7 +4,7 @@ A Streamlit dashboard for looking at a single stock, comparing several tickers s
 
 No API keys or configuration are needed.
 
-The code dates from March 2025. It was last run on 8 October 2026: the server starts and all three modes run with their default inputs, but some figures are wrong and the news tab came back empty. See [Known issues](#known-issues).
+The code dates from March 2025. All three modes were last run on 8 October 2026: the server starts and each mode runs with its default inputs, but some figures are wrong. See [Known issues](#known-issues). The news tab came back empty in that run. After the news lookup was changed, the default Stock Analysis page was run again on 9 October 2026 and the tab showed ten headlines.
 
 ## What it does
 
@@ -61,9 +61,9 @@ Portfolio figures use one year of daily prices. The purchase price is the close 
 - Company info and news lookups make up to five attempts, waiting about 4, 8, 16 and 32 seconds between attempts plus up to half a second of random jitter. The company info lookup tries again when the result is empty or the error message contains `429`, and any other error ends it at once. The news lookup tries again whenever an attempt finds no headlines: an error raised by `yfinance` or by the page scrape is logged and counted as an empty result. Price history and financial statements are requested once.
 - Page scraping goes through a shared `requests.Session` that retries GET requests up to five times on 429, 500, 502, 503 and 504 responses. The helpers also assign this session to a `_session` attribute on the `yfinance` ticker object. yfinance 1.7.0 does not read that attribute, so its own requests are unaffected.
 
-News is looked up in this order: `yfinance`; then a scrape of the ticker's news page on Yahoo Finance; then, if there is still nothing usable, a scrape of the ticker's page on MarketWatch.
+News is looked up in this order: `Ticker.news` from `yfinance`; then Yahoo's search endpoint through `yfinance.Search`, asking for ten headlines for the symbol (skipped with a yfinance older than 0.2.51, which has no `Search`); then a scrape of the ticker's news page on Yahoo Finance; then, if there is still nothing usable, a scrape of the ticker's page on MarketWatch.
 
-Items from the first two sources are read by `components/news_parser.py`, which accepts both layouts `yfinance` has used for a news item:
+Items from the first three sources are read by `components/news_parser.py`, which accepts both layouts `yfinance` has used for a news item:
 
 - flat, with `title`, `link`, `publisher` and `providerPublishTime` at the top level. `Ticker.news` returned this up to yfinance 0.2.50, and `yfinance.Search(...).news` still does.
 - nested under a `content` key, with `title`, `summary`, `pubDate`, `provider.displayName` and the address in `clickThroughUrl.url`, `canonicalUrl.url` or `previewUrl` (the first one present is used). `Ticker.news` returns this from yfinance 0.2.51 on.
@@ -112,6 +112,8 @@ The tests make no network calls.
 
 `tests/test_news_parser.py` checks `components/news_parser.py` against one fixture for each layout of a news item. The fixtures in `tests/fixtures/` use the key names of real items with invented headlines, publishers and addresses. `news_flat.json` follows what `yfinance.Search("AAPL").news` returned on 9 October 2026. `news_nested.json` follows `Ticker.news` output from January and February 2026 that other projects have published, because Yahoo answered the request behind `Ticker.news` with HTTP 404 on the day the fixtures were written.
 
+`tests/test_news_sources.py` replaces `yfinance`, the HTTP session and the waits with fakes and checks the order in which the news lookup tries its sources.
+
 ## Deploying
 
 The app reads no secrets or environment variables. A host only has to install `requirements.txt` and run `app.py` with Streamlit. For Streamlit Community Cloud, follow [Deploy your app on Community Cloud](https://docs.streamlit.io/deploy/streamlit-community-cloud/deploy-your-app/deploy) with a fork of this repository. Deployment was not tried while writing this README.
@@ -138,6 +140,7 @@ finance-tracker/
 │   └── utils.py           # Cached, rate-limited yfinance helpers and the shared requests session
 ├── tests/
 │   ├── test_news_parser.py
+│   ├── test_news_sources.py
 │   └── fixtures/          # One sample of each news item layout
 └── utils/
     ├── __init__.py
@@ -153,9 +156,9 @@ Code that is present but never called:
 
 ## Known issues
 
-Found on 8 October 2026 by running the script through Streamlit's `AppTest` harness on Python 3.13 with the versions above, using the default inputs unless stated. The news, dividend yield and portfolio results were the same on Python 3.10 and 3.14. In a browser, only the Overview tab of the default Stock Analysis page and the Performance tab of Portfolio Analysis were opened, and both showed the same figures; nothing else was inspected in a browser.
+Found on 8 October 2026 by running the script through Streamlit's `AppTest` harness on Python 3.13 with the versions above, using the default inputs unless stated. The dividend yield and portfolio results were the same on Python 3.10 and 3.14. In a browser, only the Overview tab of the default Stock Analysis page and the Performance tab of Portfolio Analysis were opened, and both showed the same figures; nothing else was inspected in a browser. The news entry is from 9 October 2026, on Python 3.13, after the news lookup was changed: the default Stock Analysis page was run again, and each of the other three sources was requested on its own.
 
-- **The news tab came back empty.** `yfinance` returned no news items (Yahoo answered its request with HTTP 404), the Yahoo Finance page scrape matched no elements, and MarketWatch answered HTTP 401. The tab showed its "No news articles could be retrieved" warning. The retry waits described above made the first run for a ticker take about 75 seconds.
+- **Three of the four news sources returned nothing.** Yahoo answered the request behind `Ticker.news` with HTTP 404, as it had on 8 October, the Yahoo Finance page scrape matched no elements, and MarketWatch answered HTTP 401. The ten headlines the tab showed came from the search endpoint. If that source fails as well, the tab shows its "No news articles could be retrieved" warning after the retry waits described above. On 8 October, before the search endpoint was a source, that made the first run for a ticker take about 75 seconds.
 - **Dividend yield is shown 100 times too large.** `yfinance` reported `dividendYield` already as a percentage (0.32 for AAPL). The Financials tab, the Compare Stocks table and the portfolio holdings table multiply it by 100 again and showed 32.00%. The portfolio-level "Dividend Yield" figure does not rescale it and is unaffected.
 - **"Show RSI" off with "Show MACD" on breaks the Technical Analysis tab.** The MACD chart is drawn, then an error about the variable `col2` is shown, and the Volatility and Support/Resistance sub-tabs stay empty.
 - **"Show Max Drawdown" does nothing.** The checkbox value is passed to the Technical Analysis tab, and no code reads it.
@@ -167,7 +170,7 @@ Found on 8 October 2026 by running the script through Streamlit's `AppTest` harn
 
 - `yfinance` is not affiliated with or endorsed by Yahoo. Requests can be rate-limited or fail when Yahoo changes its site, and the scrapers depend on page markup that changes without notice.
 - Holdings are typed in each session; nothing is saved.
-- The automated tests cover the news item parser only. See [Tests](#tests).
+- The automated tests cover the news item parser and the order of the news sources only. See [Tests](#tests).
 - The readings shown next to indicators ("bullish", "overbought" and so on) are the textbook interpretations of those indicators. Nothing in the app is investment advice.
 
 ## License

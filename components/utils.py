@@ -122,15 +122,16 @@ def get_stock_news(ticker_symbol, max_retries=5, initial_delay=2):
             except Exception as e:
                 logger.warning(f"Error getting news from stock.news: {str(e)}")
             
-            # If news property fails, try getting it from fast_info
+            # If the news property is empty, ask Yahoo's search endpoint, which
+            # also returns headlines for a symbol (yfinance 0.2.51 and later)
             try:
-                news = stock.fast_info
-                if hasattr(news, 'news') and news.news:
-                    logger.info(f"Successfully fetched news from fast_info")
-                    return news.news
+                news = yf.Search(ticker_symbol, news_count=10).news
+                if news:
+                    logger.info(f"Successfully fetched {len(news)} news items from Yahoo search")
+                    return news
             except Exception as e:
-                logger.warning(f"Error getting news from fast_info: {str(e)}")
-            
+                logger.warning(f"Error getting news from Yahoo search: {str(e)}")
+
             # If both methods fail, try scraping the website directly
             try:
                 session = get_session()
