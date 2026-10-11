@@ -108,7 +108,7 @@ pip install pytest
 python -m pytest
 ```
 
-The tests make no network calls. On 9 October 2026 they passed on Python 3.10.18 and 3.13.7 with the package versions in the table above. The same day they passed in Linux containers on Python 3.12.15, with the versions of the 3.13.7 row, and on Python 3.9.25, where `pip` chose streamlit 1.50.0, yfinance 1.2.0, pandas 2.3.3, numpy 2.0.2 and plotly 7.1.0.
+The tests make no network calls. On 9 October 2026 they passed on Python 3.10.18 and 3.13.7 with the package versions in the table above. The same day they passed in Linux containers on Python 3.12.15, with the versions of the 3.13.7 row, and on Python 3.9.25, where `pip` chose streamlit 1.50.0, yfinance 1.2.0, pandas 2.3.3, numpy 2.0.2 and plotly 7.1.0. On 10 October 2026, with the dividend yield tests added, they passed on Python 3.13.7 with the versions of the 3.13.7 row except numpy, which was 2.5.4.
 
 `.github/workflows/ci.yml` runs them on GitHub Actions for every push and pull request: it installs `requirements.txt` and `pytest` on Python 3.12 and runs `python -m pytest`.
 
@@ -117,6 +117,8 @@ The tests make no network calls. On 9 October 2026 they passed on Python 3.10.18
 `tests/test_news_sources.py` replaces `yfinance`, the HTTP session and the waits with fakes and checks the order in which the news lookup tries its sources.
 
 `tests/test_indicators.py` checks the moving average, RSI, MACD, Bollinger Bands and ATR functions in `components/indicators.py`, which the Technical Analysis tab calls, on price series short enough to work out by hand. The working is in comments beside the expected values. The Compare Stocks mode has its own copies of the RSI and MACD formulas in `components/comparison.py`, which these tests do not reach.
+
+`tests/test_dividends.py` checks `dividend_yield_percent` in `components/dividends.py`, which works the dividend yield out as a percentage from the company info `yfinance` returns. `yfinance` passes on Yahoo's own `dividendYield` as a fraction or as a percentage, depending on the release and on which of Yahoo's endpoints answered, so the function reads nothing from that field except a value of zero. The tests cover a share in both forms of the company info, the four price fields and the order in which they are tried, a price quoted in pence, South African cents, agorot or fils, funds, a company that pays no dividend, and company info with no price, with no dividend fields or with values that are not usable numbers. Most figures are invented and can be checked by hand; the rest are figures Yahoo returned on 10 October 2026. For six shares from that day, a test checks that the result is within a fifth of Yahoo's own figure, whichever unit that figure is given in.
 
 ## Deploying
 
@@ -144,8 +146,10 @@ finance-tracker/
 │   ├── news_parser.py     # Reads both layouts of a yfinance news item; no Streamlit imports
 │   ├── comparison.py      # Compare Stocks mode
 │   ├── portfolio.py       # Portfolio Analysis mode
+│   ├── dividends.py       # Dividend yield from the company info; no Streamlit imports
 │   └── utils.py           # Cached, rate-limited yfinance helpers and the shared requests session
 ├── tests/
+│   ├── test_dividends.py
 │   ├── test_indicators.py
 │   ├── test_news_parser.py
 │   ├── test_news_sources.py
@@ -160,6 +164,7 @@ Code that is present but never called:
 
 - `components/news.py`: a keyword-based sentiment scorer and its charts (`analyze_article_sentiment`, `show_sentiment_analysis`), a view of news against price (`show_news_impact`), a second headline list (`show_recent_news`), and scrapers for Yahoo Finance and Seeking Alpha (`get_yahoo_finance_news`, `get_seeking_alpha_news`).
 - `components/charts.py`: `highlight_significant_price_changes`.
+- `components/dividends.py`: `dividend_yield_percent`, which only the tests call so far. The screens still read `dividendYield` themselves (see [Known issues](#known-issues)).
 - The `utils/` package. `utils/version_check.py` imports `pkg_resources`, which `requirements.txt` does not install; the import failed in the Python 3.13 environment above.
 
 ## Known issues
@@ -179,7 +184,7 @@ Found on 8 October 2026 by running the script through Streamlit's `AppTest` harn
 
 - `yfinance` is not affiliated with or endorsed by Yahoo. Requests can be rate-limited or fail when Yahoo changes its site, and the scrapers depend on page markup that changes without notice.
 - Holdings are typed in each session; nothing is saved.
-- The automated tests cover the news item parser, the order of the news sources and the indicator calculations behind the Technical Analysis tab. The Streamlit views and the financial statement, comparison and portfolio code have no tests. See [Tests](#tests).
+- The automated tests cover the news item parser, the order of the news sources, the indicator calculations behind the Technical Analysis tab and the dividend yield calculation. The Streamlit views and the financial statement, comparison and portfolio code have no tests. See [Tests](#tests).
 - The readings shown next to indicators ("bullish", "overbought" and so on) are the textbook interpretations of those indicators. Nothing in the app is investment advice.
 
 ## License
