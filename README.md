@@ -4,7 +4,7 @@ A Streamlit dashboard for looking at a single stock, comparing several tickers s
 
 No API keys or configuration are needed.
 
-The app was written in March 2025. All three modes were run on 8 October 2026: the server starts and each mode runs with its default inputs, but some figures are wrong and the news tab came back empty. On 9 October 2026 the news lookup and the Bollinger Band calculation were corrected, the indicator calculations were moved into a module of their own, and the tests and the CI workflow were added. The three modes were then run again with their default inputs through Streamlit's `AppTest` harness: none showed an error message and the news tab showed ten headlines. The wrong figures were not touched. See [Known issues](#known-issues).
+The app was written in March 2025. All three modes were run on 8 October 2026: the server starts and each mode runs with its default inputs, but some figures are wrong and the news tab came back empty. On 9 October 2026 the news lookup and the Bollinger Band calculation were corrected, the indicator calculations were moved into a module of their own, and the tests and the CI workflow were added. The three modes were then run again with their default inputs through Streamlit's `AppTest` harness: none showed an error message and the news tab showed ten headlines. On 10 October 2026 the dividend yield, which three screens showed 100 times too large, was corrected, and the three modes were run through `AppTest` once more with their default inputs: none showed an error message, and the dividend yield of AAPL was 0.32% on the Financials tab, in the Compare Stocks table and in the portfolio holdings table. The other wrong figures were not touched. See [Known issues](#known-issues).
 
 ## What it does
 
@@ -19,7 +19,7 @@ Enter a ticker (default `AAPL`) and choose a period (`1mo`, `3mo`, `6mo`, `1y`, 
 | Overview | Business summary, market cap, trailing P/E, 52-week high and low, volume, average volume, industry, sector, website |
 | Charts | Candlestick price chart with a volume panel |
 | Technical Analysis | Four sub-tabs, described below |
-| Financials | Four sub-tabs. Key Metrics: market cap, revenue, gross profit, trailing and forward P/E, PEG, profit and operating margins, dividend yield. Income Statement, Balance Sheet and Cash Flow: a bar chart of selected line items by reporting date, with the full statement in an expander |
+| Financials | Four sub-tabs. Key Metrics: market cap, revenue, gross profit, trailing and forward P/E, PEG, profit and operating margins, [dividend yield](#dividend-yield). Income Statement, Balance Sheet and Cash Flow: a bar chart of selected line items by reporting date, with the full statement in an expander |
 | News & Sentiment | Headlines with publisher, date and link, plus a summary when the source supplies one. No sentiment score is shown |
 
 Technical Analysis sub-tabs. Checkboxes in the sidebar, all ticked by default, control the first three:
@@ -36,7 +36,7 @@ RSI and ATR are computed with simple rolling means rather than Wilder's smoothin
 Enter comma-separated tickers (default `AAPL, MSFT, GOOGL`) and a period (same choices, default `1y`). Four tabs:
 
 - **Price Performance**: summary table (latest close, change over the period, period high and low, average volume), a price chart, a chart of percentage change since the start of the period, and a volume chart.
-- **Financial Metrics**: a table of market cap, trailing and forward P/E, PEG, price/book, profit and operating margins, ROE, ROA, revenue growth and dividend yield, with bar charts for P/E, PEG, price/book, dividend yield and the four profitability ratios.
+- **Financial Metrics**: a table of market cap, trailing and forward P/E, PEG, price/book, profit and operating margins, ROE, ROA, revenue growth and [dividend yield](#dividend-yield), with bar charts for P/E, PEG, price/book, dividend yield and the four profitability ratios.
 - **Technical Indicators**: for each ticker, price with 20- and 50-day moving averages, RSI (14) and MACD (12, 26, 9), with a one-line reading of each.
 - **Correlation**: heatmap of daily-return correlations, and the three highest and three lowest pairs.
 
@@ -44,13 +44,25 @@ Enter comma-separated tickers (default `AAPL, MSFT, GOOGL`) and a period (same c
 
 Enter tickers, share counts and purchase dates (`YYYY-MM-DD`) as three comma-separated lists of the same length. The defaults are `AAPL, MSFT, GOOGL`, `10, 15, 5` and today's date for each holding. Five tabs:
 
-- **Overview**: total value, total gain/loss, value-weighted beta and dividend yield, a holdings table, and a sector allocation chart.
+- **Overview**: total value, total gain/loss, value-weighted beta and [dividend yield](#dividend-yield), a holdings table with the dividend yield of each holding, and a sector allocation chart.
 - **Performance**: a chart of portfolio value over the past year with SPY rebased to 100, a chart of daily returns, and total return, annualised return, volatility, Sharpe ratio (2% risk-free rate assumed), maximum drawdown and beta against SPY.
 - **Risk Analysis**: correlation heatmap and, per holding, beta as reported by Yahoo Finance, annualised volatility, one-day 95% historical value at risk, and maximum drawdown.
 - **Allocation**: pie charts and tables of weights by stock and by sector.
 - **Rebalancing**: a table of the trades needed to bring every holding to an equal weight, and a recommendation for each position more than five percentage points from that target.
 
 Portfolio figures use one year of daily prices. The purchase price is the close on the purchase date when that date is a trading day within the last year. Otherwise the current price is used, which makes the gain/loss for that holding zero. With the default dates (today) the gain/loss is always zero.
+
+### Dividend yield
+
+The Financials tab, the Compare Stocks table and chart and the Portfolio Overview all take the dividend yield from `dividend_yield_percent` in `components/dividends.py`:
+
+- For a share it is the dividend per share over a year that Yahoo reports (`dividendRate`) divided by the latest price, as a percentage. The price is the first of `currentPrice`, `regularMarketPrice`, `previousClose` and `regularMarketPreviousClose` that is present. Where Yahoo quotes the price in pence (`GBp`), South African cents (`ZAc`), agorot (`ILA`) or fils (`KWF`), it gives the dividend in pounds, rand, shekels or dinars, so the price is converted to that unit first.
+- For a fund it is the fund's own `yield` field, a fraction, times 100. For SPY the Financials tab did not get that far: when Yahoo has no financial statements for a ticker, the tab shows an error message in place of its sub-tabs.
+- A ticker that Yahoo reports with a yield of zero gives zero, and one with none of these fields gives no figure. The Compare Stocks table shows `0.00%` for the first and `N/A` for the second. The Financials tab and the holdings table show `N/A` for both, and both count as zero in the portfolio's weighted yield.
+
+Yahoo's own `dividendYield` field is not shown, because `yfinance` passes it on in two units. yfinance 0.2.37 to 0.2.52 take it from Yahoo's quoteSummary endpoint, where it is a fraction (0.0032 for AAPL on 10 October 2026). From 0.2.53 on (checked up to 1.7.0), `yfinance` lays the fields of Yahoo's v7 quote endpoint over those, and there it is a percentage (0.32). From 1.5.1 on, when the v7 request fails with an HTTP error, the fraction is what remains. That last case was reproduced on yfinance 1.7.0 by simulating the error. Of the older releases tried on 10 October 2026, 0.2.58 returned company info, with the percentage, and 0.2.37, 0.2.52, 0.2.53 and 0.2.57 returned none: Yahoo answered them with "Too Many Requests". `trailingAnnualDividendYield` is not used either: for a depositary receipt Yahoo divides a dividend in the company's reporting currency by a price in dollars, which gave 1.04, or 104%, for SONY.
+
+The result can differ from Yahoo's own `dividendYield`. Yahoo gives the dividend rate to two decimal places, its own figure is not always that rate over the latest price, and it changed between two requests in one run on 10 October 2026: MSFT came back as 0.75 for the Compare Stocks table and as 0.74 for the holdings table. For 45 of 49 dividend-paying shares checked that day the result was within 0.2 percentage points of Yahoo's figure. The largest differences were 4.88% against 4.23% for NBK.KW, whose dividend rate is 0.04 dinars, and 5.00% against 4.54% for T. For each of 15 funds checked, `yield` times 100 was the `dividendYield` that the v7 endpoint gave.
 
 ## How data is fetched
 
@@ -118,7 +130,7 @@ The tests make no network calls. On 9 October 2026 they passed on Python 3.10.18
 
 `tests/test_indicators.py` checks the moving average, RSI, MACD, Bollinger Bands and ATR functions in `components/indicators.py`, which the Technical Analysis tab calls, on price series short enough to work out by hand. The working is in comments beside the expected values. The Compare Stocks mode has its own copies of the RSI and MACD formulas in `components/comparison.py`, which these tests do not reach.
 
-`tests/test_dividends.py` checks `dividend_yield_percent` in `components/dividends.py`, which works the dividend yield out as a percentage from the company info `yfinance` returns. `yfinance` passes on Yahoo's own `dividendYield` as a fraction or as a percentage, depending on the release and on which of Yahoo's endpoints answered, so the function reads nothing from that field except a value of zero. The tests cover a share in both forms of the company info, the four price fields and the order in which they are tried, a price quoted in pence, South African cents, agorot or fils, funds, a company that pays no dividend, and company info with no price, with no dividend fields or with values that are not usable numbers. Most figures are invented and can be checked by hand; the rest are figures Yahoo returned on 10 October 2026. For six shares from that day, a test checks that the result is within a fifth of Yahoo's own figure, whichever unit that figure is given in.
+`tests/test_dividends.py` checks `dividend_yield_percent` in `components/dividends.py`, which works out the [dividend yield](#dividend-yield) every screen shows, as a percentage, from the company info `yfinance` returns. `yfinance` passes on Yahoo's own `dividendYield` as a fraction or as a percentage, depending on the release and on which of Yahoo's endpoints answered, so the function reads nothing from that field except a value of zero. The tests cover a share in both forms of the company info, the four price fields and the order in which they are tried, a price quoted in pence, South African cents, agorot or fils, funds, a company that pays no dividend, and company info with no price, with no dividend fields or with values that are not usable numbers. Most figures are invented and can be checked by hand; the rest are figures Yahoo returned on 10 October 2026. For six shares from that day, a test checks that the result is within a fifth of Yahoo's own figure, whichever unit that figure is given in.
 
 ## Deploying
 
@@ -164,16 +176,14 @@ Code that is present but never called:
 
 - `components/news.py`: a keyword-based sentiment scorer and its charts (`analyze_article_sentiment`, `show_sentiment_analysis`), a view of news against price (`show_news_impact`), a second headline list (`show_recent_news`), and scrapers for Yahoo Finance and Seeking Alpha (`get_yahoo_finance_news`, `get_seeking_alpha_news`).
 - `components/charts.py`: `highlight_significant_price_changes`.
-- `components/dividends.py`: `dividend_yield_percent`, which only the tests call so far. The screens still read `dividendYield` themselves (see [Known issues](#known-issues)).
 - The `utils/` package. `utils/version_check.py` imports `pkg_resources`, which `requirements.txt` does not install; the import failed in the Python 3.13 environment above.
 
 ## Known issues
 
-Found on 8 October 2026 by running the script through Streamlit's `AppTest` harness on Python 3.13 with the versions above, using the default inputs unless stated. The dividend yield and portfolio results were the same on Python 3.10 and 3.14. In a browser, only the Overview tab of the default Stock Analysis page and the Performance tab of Portfolio Analysis were opened, and both showed the same figures; nothing else was inspected in a browser. The two news entries are from 9 October 2026, on Python 3.13, after the news lookup was changed: the default Stock Analysis page was run again, each of the other three sources was requested on its own, and the search endpoint was asked about the symbols named below.
+Found on 8 October 2026 by running the script through Streamlit's `AppTest` harness on Python 3.13 with the versions above, using the default inputs unless stated. The portfolio results were the same on Python 3.10 and 3.14. In a browser, only the Overview tab of the default Stock Analysis page and the Performance tab of Portfolio Analysis were opened, and both showed the same figures; nothing else was inspected in a browser. The two news entries are from 9 October 2026, on Python 3.13, after the news lookup was changed: the default Stock Analysis page was run again, each of the other three sources was requested on its own, and the search endpoint was asked about the symbols named below.
 
 - **Three of the four news sources returned nothing.** Yahoo answered the request behind `Ticker.news` with HTTP 404, as it had on 8 October, the Yahoo Finance page scrape matched no elements, and MarketWatch answered HTTP 401. The ten headlines the tab showed came from the search endpoint. If that source fails as well, the tab shows its "No news articles could be retrieved" warning after the retry waits described above. On 8 October, before the search endpoint was a source, that made the first run for a ticker take about 75 seconds.
 - **Search headlines are filtered by related ticker.** Yahoo's search endpoint matches the symbol as text, so for a symbol that is also an everyday word most of what it returns is unrelated: of the ten headlines returned for each of `ALL` (Allstate), `KEY` (KeyCorp) and `HAS` (Hasbro), none listed the symbol in its `relatedTickers` field, and of the ten for `NOW` (ServiceNow) one did. The tab therefore keeps only the headlines whose `relatedTickers` name the symbol. Every headline returned for `AAPL`, `MSFT` and `F` listed the symbol, so nothing is lost there. The filter is stricter than it needs to be for a company with two share classes: for `GOOGL` it keeps one of ten, because the other nine were tagged with `GOOG`.
-- **Dividend yield is shown 100 times too large.** `yfinance` reported `dividendYield` already as a percentage (0.32 for AAPL). The Financials tab, the Compare Stocks table and the portfolio holdings table multiply it by 100 again and showed 32.00%. The portfolio-level "Dividend Yield" figure does not rescale it and is unaffected.
 - **"Show RSI" off with "Show MACD" on breaks the Technical Analysis tab.** The MACD chart is drawn, then an error about the variable `col2` is shown, and the Volatility and Support/Resistance sub-tabs stay empty.
 - **"Show Max Drawdown" does nothing.** The checkbox value is passed to the Technical Analysis tab, and no code reads it.
 - **Portfolio Performance figures are not usable.** The portfolio value series is built on a calendar-day index and is zero on every day without trading (114 of 365 days in the run). The value chart drops to zero on those days, and the tab showed `nan` for volatility, Sharpe ratio and beta and -100.00% for maximum drawdown. When the current day has no price bar, the series also ends at zero and total and annualised return show -100.00% (reproduced by dropping the latest bar). SPY is rebased to 100 but drawn on the same dollar axis as the portfolio value.

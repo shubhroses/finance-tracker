@@ -1,6 +1,7 @@
 import streamlit as st
 import pandas as pd
 import plotly.graph_objects as go
+from .dividends import dividend_yield_percent
 from .utils import get_stock_financials
 
 def format_currency(value):
@@ -107,7 +108,8 @@ def show_financial_metrics(ticker_symbol, info=None):
             with col3:
                 st.metric("Profit Margin", f"{info.get('profitMargins', 0)*100:.2f}%" if info.get('profitMargins') else "N/A")
                 st.metric("Operating Margin", f"{info.get('operatingMargins', 0)*100:.2f}%" if info.get('operatingMargins') else "N/A")
-                st.metric("Dividend Yield", f"{info.get('dividendYield', 0)*100:.2f}%" if info.get('dividendYield') else "N/A")
+                dividend_yield = dividend_yield_percent(info)
+                st.metric("Dividend Yield", f"{dividend_yield:.2f}%" if dividend_yield else "N/A")
     
     with fin_tabs[1]:
         if income_stmt is not None and not income_stmt.empty:

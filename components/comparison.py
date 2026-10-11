@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import plotly.graph_objects as go
 from plotly.subplots import make_subplots
+from .dividends import dividend_yield_percent
 
 def show_stock_comparison():
     """Display stock comparison analysis."""
@@ -227,7 +228,7 @@ def show_financial_comparison(tickers):
                     'ROE': info.get('returnOnEquity', None),
                     'ROA': info.get('returnOnAssets', None),
                     'Revenue Growth': info.get('revenueGrowth', None),
-                    'Dividend Yield': info.get('dividendYield', None)
+                    'Dividend Yield': dividend_yield_percent(info)
                 }
                 
                 financial_data.append(metrics)
@@ -252,7 +253,8 @@ def show_financial_comparison(tickers):
                 'ROE': lambda x: f"{x:.2%}" if pd.notnull(x) else 'N/A',
                 'ROA': lambda x: f"{x:.2%}" if pd.notnull(x) else 'N/A',
                 'Revenue Growth': lambda x: f"{x:.2%}" if pd.notnull(x) else 'N/A',
-                'Dividend Yield': lambda x: f"{x:.2%}" if pd.notnull(x) else 'N/A'
+                # already a percentage, unlike the fractions above
+                'Dividend Yield': lambda x: f"{x:.2f}%" if pd.notnull(x) else 'N/A'
             }
             
             formatted_df = df.copy()

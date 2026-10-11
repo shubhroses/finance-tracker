@@ -6,6 +6,7 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 from datetime import datetime
 import plotly.express as px
+from .dividends import dividend_yield_percent
 
 def show_portfolio_analyzer():
     """Display portfolio analysis tools."""
@@ -142,7 +143,8 @@ def get_portfolio_data(tickers, shares, dates):
                     'Company Name': info.get('longName', ticker),
                     'Sector': info.get('sector', 'Unknown'),
                     'Beta': info.get('beta', 1.0),
-                    'Dividend Yield': info.get('dividendYield', 0),
+                    # a percentage; 0 when unknown, which the holdings table shows as N/A
+                    'Dividend Yield': dividend_yield_percent(info) or 0,
                     'Weight': (market_value / total_value) * 100 if total_value > 0 else 0
                 })
         
@@ -215,7 +217,7 @@ def show_portfolio_summary(portfolio_data):
             'Gain/Loss': f"${stock['Gain/Loss']:,.2f}",
             'Gain/Loss %': f"{stock['Gain/Loss %']:+.1f}%",
             'Beta': f"{stock['Beta']:.2f}",
-            'Div Yield': f"{stock['Dividend Yield']*100:.2f}%" if stock['Dividend Yield'] else 'N/A'
+            'Div Yield': f"{stock['Dividend Yield']:.2f}%" if stock['Dividend Yield'] else 'N/A'
         })
     
     summary_df = pd.DataFrame(summary_data)
